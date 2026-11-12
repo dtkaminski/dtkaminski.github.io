@@ -21110,6 +21110,13 @@ function useV3Plan() {
 // customers are valued sit in a settings row. Clicking the growth chart picks growth and margin together.
 const V3_GY_Q = (g, m, lv, vb, lev) => (sb, b) => sb.rpc('fn_plan_growth', { p_brand: b, p_growth: g, p_margin: m, p_level: lv, p_value: vb, p_levers: lev })
   .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
+// 1260: the confirmed target sheet (docs/DESIGN-target-sheet-2026-11-12.md, phase A). The owner's growth, margin and levers
+// are stored with what follows from them; nothing downstream reads the sheet yet. The page still shows the live planner
+// on those inputs, so no stored figure is shown beside a live one.
+const V3_TS_Q = (sb, b) => sb.rpc('fn_target_sheet', { p_brand: b })
+  .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
+const v3GyLevEq = (a, b) => { const ka = Object.keys(a || {}), kb = Object.keys(b || {});
+  return ka.length === kb.length && ka.every(k => b[k] != null && Math.abs(Number(a[k]) - Number(b[k])) < 1e-9); };
 // realism: how hard the plan is for this brand to deliver, against its own record (not how sure the figures are)
 const V3_GY_REAL = {
   within_record: ['Within your record', 'v3-pill-good'],
@@ -21198,6 +21205,16 @@ function V3GrowthYear() {
   const onKey = f => e => { if (e.key === 'Enter') f(); };
   const setLever = (k, v) => setLev(o => Object.assign({}, o, { [k]: v }));
   const setAll = o => { setLev(o); setLevQ(o); };
+  const ts = useV3Rows('target-sheet', V3_TS_Q);
+  const TS = ts.rows && ts.rows[0] ? ts.rows[0] : null, S = TS && TS.ok ? TS.sheet : null;
+  const tsBack = React.useRef(false);              // the saved inputs are put back once, when the sheet first arrives
+  React.useEffect(() => { if (!S || tsBack.current) return; tsBack.current = true;
+    const gv = S.growth == null ? null : Number(S.growth), mv = Number(S.margin);
+    setG(gv); setGTxt(gv == null ? '' : String(Math.round(gv * 100)));
+    setM(mv); setMTxt(String(Math.round(mv * 1000) / 10));
+    setLv(S.margin_level || 'cm3'); setVb(S.value_basis || '12m'); setAll(S.levers || {}); }, [S]);
+  const [tsBusy, setTsBusy] = React.useState(false);
+  const [tsErr, setTsErr] = React.useState(null);
 
   const head = (pill) => (<div className="v3-panel-head"><h2>Next 12 months</h2>
     {P && <span className="v3-muted">{v3Month(P.period_start, 'long')} to {v3Month(P.period_end, 'long')}</span>}
@@ -21314,6 +21331,24 @@ function V3GrowthYear() {
   const saleMonths = LY && (LY.sale_months || []).map(s => v3Month(s, 'long'));
   const onBasis = P.value_basis === '12m' && PL.margin_on_basis != null && isFinite(Number(PL.margin)) && Math.abs(Number(PL.margin_on_basis) - Number(PL.margin)) >= 0.005;
   const mix = LVk.np && LVk.np.mix ? V3_GY_MIX.filter(x => LVk.np.mix[x[0]] != null) : [];
+  // 1260: Set when the inputs on screen are the saved ones; Draft when they have moved; Not set before the first save
+  const tsSame = !!S && (S.growth == null ? g == null : g != null && Math.abs(Number(S.growth) - g) < 1e-9)
+    && Math.abs(Number(S.margin) - Number(m != null ? m : P.margin_target)) < 0.0006
+    && S.margin_level === lv && S.value_basis === vb && v3GyLevEq(S.levers || {}, levQ);
+  const tsPill = !S ? ['Not set', 'v3-pill-none'] : tsSame ? ['Set', 'v3-pill-good'] : ['Draft', 'v3-pill-none'];
+  const tsSettled = !busy && !failed && v3GyLevEq(lev, levQ);   // the answer on screen is for the inputs on screen
+  const useTargets = () => {
+    const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+    if (!sb || !b || tsBusy) return;
+    setTsBusy(true); setTsErr(null);
+    sb.rpc('fn_confirm_target_sheet', { p_brand: b, p_growth: g, p_margin: m, p_level: lv, p_value: vb, p_levers: levJ })
+      .then(r => {
+        if (r && r.error) setTsErr(r.error.code === '42501' ? 'Only the owner or an editor can set targets.' : 'The targets were not saved.');
+        else if (!r || !r.data || !r.data.ok) setTsErr(V3_GY_EMPTY[r && r.data && r.data.reason] || 'The targets were not saved.');
+        else v3QRefresh(['target-sheet']);
+      }, () => setTsErr('The targets were not saved.'))
+      .then(() => setTsBusy(false));
+  };
 
   return (<section className="v3-panel v3-gy" aria-label="Year plan" aria-busy={busy}>
     {head(real)}
@@ -21395,6 +21430,13 @@ function V3GrowthYear() {
       <button type="button" className="v3-btn v3-btn-sm" onClick={fillBest}>Every lever at its best</button>
       <button type="button" className="v3-btn v3-btn-sm" aria-pressed={lyOn} onClick={() => setAll({})}>Last year</button>
     </div>}
+    {TS && <div className="v3-panel-pad v3-gy-ctl v3-gy-set" role="group" aria-label="Targets">
+      <div className="v3-field"><span>Targets</span><b className={'v3-pill ' + tsPill[1]}>{tsPill[0]}</b></div>
+      {S && <div className="v3-field"><span>Set on</span><b className="v3-num">{v3Day(S.confirmed_at, true)}</b></div>}
+      {S && S.rederived && S.rederived.at && <div className="v3-field"><span>Worked out again</span><b className="v3-num">{v3Day(S.rederived.at, true)}</b></div>}
+      {TS.can_edit && <button type="button" className="v3-btn v3-btn-p v3-btn-sm" disabled={tsBusy || tsSame || !tsSettled} onClick={useTargets}>Use these targets</button>}
+    </div>}
+    {tsErr && <p className="v3-panel-note" role="alert">{tsErr}</p>}
 
     <div className="v3-panel-pad v3-mk-charts">
       <figure className="v3-bridge v3-bridge-wide v3-gy-bridge" role="img" aria-label={bRows.map(r => r.k + ' ' + (r.abs ? v3GbpRound(r.v) : v3GyAdd(r.v))).join(', ')}>
