@@ -17332,8 +17332,9 @@ function v3PlainAction(row){
   if (/^order-cost-/.test(id) && (x = m(/\bCut ([A-Z]\w*) from the £([\d,]+) it spent in the last 7 days: (?:your plan's budget|the weekly target) for all your ads together is (?:about )?£([\d,]+) a week for the rest of (\w+)/))) {
     return P('Cut ' + x[1] + ' from £' + x[2] + ' a week, toward the plan’s £' + x[3] + ' a week for all your ads, for the rest of ' + x[4], raw.slice(0, raw.indexOf(x[0])).trim() || raw);
   }
-  if (/^order-cost-/.test(id) && (x = m(/\b(Cut [A-Z]\w* from (?:about )?£[\d,]+ a week back toward £[\d,]+ a week)/))) {
-    return P(x[1], raw.slice(0, raw.indexOf(x[1])).trim() || raw);
+  // 12 Nov (1251): the row names its window in brackets after the first figure; the title leaves the brackets out
+  if (/^order-cost-/.test(id) && (x = m(/\b(Cut [A-Z]\w* from (?:about )?£[\d,]+ a week)(?: \([^)]*\))?( back toward £[\d,]+ a week)/))) {
+    return P(x[1] + x[2], raw.slice(0, raw.indexOf(x[0])).trim() || raw);
   }
   if (/^order-cost-/.test(id) && (x = m(/\bKeep ([A-Z]\w*) within (?:your plan's budget|the weekly target) for all your ads together, (?:about )?£([\d,]+) a week for the rest of (\w+)/))) {
     return P('Keep ' + x[1] + ' within the plan’s £' + x[2] + ' a week for all your ads, for the rest of ' + x[3], raw.slice(0, raw.indexOf(x[0])).trim() || raw);
@@ -17363,6 +17364,15 @@ function v3PlainAction(row){
   if (id === 'email-campaign-drop') return P(/Opens held up/i.test(raw) ? 'Change what your email campaigns offer: they sell less for each email sent'
     : /fewer people open|opens fell/i.test(raw) ? 'Check your email campaigns reach inboxes: fewer people open them' : 'Find out why your email campaigns sell less', raw);
   if (id === 'email-cart-reach') return P('Widen your abandoned basket email so it reaches more shoppers', raw);
+  // 12 Nov: ten row types still showed their whole first sentence as the title (up to 227 characters on Actions).
+  // A short instruction for each; the sentence is the detail under it.
+  if (/^voice-delivery/.test(id) && (x = m(/^Parcels sent "([^"]+)"/))) return P('Look into the "' + x[1] + '" delivery option: more parcels go missing on it', raw);
+  if (id === 'cogs-coverage' && /none include freight or duty/.test(raw)) return P('Add freight and duty to your product costs', raw);
+  if (id === 'discount-reference-price' && (x = m(/^(\d+) of your marked-down products? show/))) return P('Check the "was" price on ' + x[1] + ' marked-down product' + (x[1] === '1' ? '' : 's'), raw);
+  if (id === 'cash-trapped-stock' && (x = m(/^(?:About )?(£[\d,]+) of your cash is tied up/))) return P('Free the ' + x[1] + ' tied up in slow stock', raw);
+  if (/^code-kind-/.test(id) && (x = m(/^The code (\S+) brought/))) return P('Say what the code ' + x[1] + ' is', raw);
+  if (id === 'cash-inputs' && /without today's bank balance/.test(raw)) return P('Enter today’s bank balance', raw);
+  if (id === 'google-split-brand') return P('Split Google campaigns into new and returning customers', raw);
   if (id === 'site-errors') return P('Find and fix the errors on your site', raw);
   if (/^returns-product-/.test(id)) { const nm = (raw.match(/with "([^"]+)" in them/) || [])[1];
     return P(nm ? 'Find out why ' + nm + ' comes back so often' : 'Find out why one product comes back so often', raw); }
@@ -18443,7 +18453,26 @@ function v3CauseLine(why, title) {
     if (last && ((last.match(/"/g) || []).length % 2 === 1)) sents[sents.length - 1] = last + ' ' + p; else sents.push(p);
   }
   const tt = String(title || '').toLowerCase().replace(/[.:]$/, '');
-  return v3Money(sents.find(s => s.length > 12 && !tt.includes(s.toLowerCase().replace(/[.:]$/, ''))) || '');
+  return v3Money(v3ClipClause(sents.find(s => s.length > 12 && !tt.includes(s.toLowerCase().replace(/[.:]$/, ''))) || ''));
+}
+// 12 Nov: the line under a row's title is one glance. A first sentence that lists five searches or three products
+// ran to 400 characters in the table. Past 180 it stops at its last whole clause before 170 (the full sentence is in
+// the detail), and only where that leaves brackets and quotes closed, so no figure is cut in half.
+function v3ClipClause(s) {
+  s = String(s || '');
+  if (s.length <= 180) return s;
+  const marks = [' (', '; ', ': ', ', '];
+  let best = -1;
+  for (const k of marks) {
+    let i = s.lastIndexOf(k, 170);
+    while (i > 60) {
+      const head = s.slice(0, i);
+      const open = (head.match(/\(/g) || []).length === (head.match(/\)/g) || []).length && (head.match(/"/g) || []).length % 2 === 0;
+      if (open) { if (i > best) best = i; break; }
+      i = s.lastIndexOf(k, i - 1);
+    }
+  }
+  return best > 60 ? s.slice(0, best).replace(/[,;:]\s*$/, '') + '.' : s;
 }
 // The time a decision call can take before the button says so.
 async function v3Decide(ext, decision, until, reason) {
