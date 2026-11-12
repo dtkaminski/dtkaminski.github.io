@@ -11787,7 +11787,8 @@ function V3ActionBoard(){
     ...((exQ && Array.isArray(exQ.rows)) ? exQ.rows : []).filter(x => x.accepted_at).map(x => x.external_id)].filter(id => shownIds.has(id))).size;
   const tiles = !T ? [] : [
     Number(T.stock_month) > 0 && { k: 'Profit at stake in stock', v: v3GbpRound(T.stock_month), d: 'a month' },
-    Number(T.save_month) > 0 && { k: 'Ad spend to save', v: v3GbpRound(T.save_month), d: 'a month' },
+    // 12 Nov: this is the profit the ad cuts keep (5,036 on Halden), not the spend they save (14,243)
+    Number(T.save_month) > 0 && { k: 'Profit from ad cuts', v: v3GbpRound(T.save_month), d: 'a month' },
     Number(T.other_month) > 0 && { k: 'Other changes', v: v3GbpRound(T.other_month), d: 'a month, ' + (Number(T.other_n) === 1 ? '1 change' : T.other_n + ' changes') },
     Number(T.once_gbp) > 0 && { k: 'Before the peak', v: v3GbpRound(T.once_gbp), d: 'once, ' + (Number(T.once_n) === 1 ? '1 change' : T.once_n + ' changes') },
     Number(T.tests) > 0 && { k: 'Tests to run', v: fmtCount(T.tests), d: '' },
@@ -11819,7 +11820,11 @@ function V3ActionBoard(){
             <button type="button" className="v3-panel-link" aria-expanded={showSmall} onClick={() => setShowSmall(s => !s)}>{showSmall ? 'Hide' : 'Show'} {smallRows.length} smaller</button>
             <span className="v3-muted">Each under {v3GbpRound(floor)} a month</span></td></tr>}
           {unverRows.length > 0 && group('Open over a month', unverRows.length, 'No test tells when these are fixed. Mark each one done, or dismiss it.')}
-          {unverRows.map(line)}
+          {/* 12 Nov: the small-row fold covered the ranked groups only; seven rows from 25 to 119 a month showed here */}
+          {unverRows.filter(r => showSmall || !isSmall(r)).map(line)}
+          {unverRows.some(isSmall) && <tr className="v3-acts-foot"><td colSpan={7}>
+            <button type="button" className="v3-panel-link" aria-expanded={showSmall} onClick={() => setShowSmall(s => !s)}>{showSmall ? 'Hide' : 'Show'} {unverRows.filter(isSmall).length} smaller</button>
+            <span className="v3-muted">Each under {v3GbpRound(floor)} a month</span></td></tr>}
           {lane.length > 0 && group('No figure yet', lane.length)}
           {lane.map(line)}
         </tbody>
@@ -17255,8 +17260,11 @@ function v3PlainAction(row){
   // £35,370 a week in November ..."): the title keeps this month's weekly figure, the why says what the last 7 days ran at.
   if (id === 'ad-budget' && (x = m(/to (?:about )?(£[\d,]+) a week for the rest of (\w+)/))) {
     const was = m(/from (£[\d,]+) in the last 7 days(?: \(([^)]+)\))?/), times = (m(/ran at about ([\d.]+) times that/) || [])[1];
+    // 12 Nov (1254): the row says when its budget is the confirmed plan worked out again; the rebuilt why dropped it,
+    // so Actions and the drawer showed a cut with nothing to tell the two plans apart
+    const plans = (m(/The plan you confirmed on [^.]+\./) || [])[0];
     return P('Cut all your ads to ' + x[1] + ' a week for the rest of ' + x[2],
-      was ? 'Your ads ran at ' + was[1] + ' in the last 7 days' + (was[2] ? ' (' + was[2] + ')' : '') + (times ? ', about ' + times + ' times that' : '') + '.' : raw);
+      was ? 'Your ads ran at ' + was[1] + ' in the last 7 days' + (was[2] ? ' (' + was[2] + ')' : '') + (times ? ', about ' + times + ' times that' : '') + '.' + (plans ? ' ' + plans : '') : raw);
   }
   // site-funnel-weakstep led with its evidence and no instruction ("About 13% fewer of your visits end in an order")
   if (id === 'site-funnel-weakstep') {
@@ -19376,7 +19384,9 @@ function V3GoalChart({ P, g }) {
   const yF = Y(Number(g.forecast)), yG = Y(Number(g.target));
   // the end labels never sit on each other: 30 apart at least, two lines each, kept inside the chart
   const lx = w - right + 8;
-  const labs = [{ k: 'Forecast', v: g.forecast, y: yF, c: 'v3-al-lab v3-al-lab-fc' }, { k: 'Goal', v: g.target, y: yG, c: 'v3-al-lab' }]
+  // 12 Nov: the tiles above say "Plan lands" for a confirmed plan; the chart said "Forecast" for the same figure
+  const fcWord = g.forecast_kind === 'confirmed_plan' ? 'Plan lands' : 'Forecast';
+  const labs = [{ k: fcWord, v: g.forecast, y: yF, c: 'v3-al-lab v3-al-lab-fc', round: true }, { k: 'Goal', v: g.target, y: yG, c: 'v3-al-lab' }]
     .concat(showPace ? [{ k: w < 520 ? 'At pace' : 'At today’s pace', v: pace, y: Y(pace), c: 'v3-al-lab v3-al-lab-pace' }] : []).sort((p, q) => p.y - q.y);
   labs.forEach((l, i) => { l.at = Math.max(l.y, i ? labs[i - 1].at + 30 : top); });
   const over = labs[labs.length - 1].at - (H - bottom - 14);
@@ -19404,12 +19414,12 @@ function V3GoalChart({ P, g }) {
       <path className="v3-al-act" d={path(a)}/>
       <line className="v3-al-today" x1={X(today)} x2={X(today)} y1={top - 8} y2={H - bottom}/>
       <circle className="v3-al-dot" cx={X(v3Ms(last.d))} cy={Y(last.v)} r="4"/>
-      {labs.map(l => <text key={l.k} className={l.c} x={lx} y={l.at}><tspan x={lx} className="v3-al-lab-k">{l.k}</tspan><tspan x={lx} dy="14">{v3Gbp(l.v)}</tspan></text>)}
+      {labs.map(l => <text key={l.k} className={l.c} x={lx} y={l.at}><tspan x={lx} className="v3-al-lab-k">{l.k}</tspan><tspan x={lx} dy="14">{l.round ? v3GbpRound(l.v) : v3Gbp(l.v)}</tspan></text>)}
       {hover && <line className="v3-al-hover" x1={X(hover.ms)} x2={X(hover.ms)} y1={top} y2={H - bottom}/>}
     </svg>
     {hover && hv != null && <figcaption className={'v3-al-tip' + (X(hover.ms) > w * 0.6 ? ' left' : '')} style={{ left: (X(hover.ms) / w * 100) + '%' }}>
       <b>{v3Day(new Date(hover.ms).toISOString().slice(0, 10))}</b>
-      <span>{hover.past ? 'So far' : 'Forecast'} <em>{v3Gbp(Math.round(hv))}</em></span>
+      <span>{hover.past ? 'So far' : fcWord} <em>{hover.past ? v3Gbp(Math.round(hv)) : v3GbpRound(hv)}</em></span>
       <span>Goal by then <em>{v3Gbp(Math.round(hg))}</em></span></figcaption>}
   </figure>);
 }
@@ -20291,6 +20301,8 @@ function V3HomeDrawer({ row, why, closes, closesTo, startMode, onClose }) {
       </dl>
       {row.lane_said && <p className="v3-drawer-p">{v3Tidy(row.lane_said)}</p>}
       {steps.length > 0 && <section className="v3-drawer-sec"><h3>Steps</h3><ol className="v3-mv-steps">{steps.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol></section>}
+      {/* 12 Nov (1254): where the row's budget is the confirmed plan worked out again, the drawer says so */}
+      {(() => { const pl = String(pa.raw || '').match(/The plan you confirmed on [^.]+\./); return pl ? <p className="v3-panel-note">{v3Tidy(pl[0])}</p> : null; })()}
       {others.length > 0 && <section className="v3-drawer-sec"><V3PlanSteps plan={Object.assign({}, row.plan, { steps: others })} rank={1}/></section>}
       <section className="v3-drawer-sec v3-drawer-decide"><V3MoveDecide row={row} startMode={startMode} onDecided={onClose}/></section>
       <section className="v3-drawer-sec">
