@@ -27463,8 +27463,13 @@ function V3AnatomyCoverage() {
 // What Greta has learned about this brand (12 Oct re-eval): Greta starts every brand on a typical brand and
 // replaces each piece with the brand's own data as it builds up. vw_brand_learning_status says where each
 // piece stands; vw_action_track_record how often checked actions moved the number they promised (0449).
+// 12 Nov (1244): the live view takes 7.8 s on a large brand against the 8 s limit, so it failed now and then.
+// The hourly cached row is read first; the view is the fallback for a brand with no row, or before 1244.
+const V3_LEARN_COLS = 'profile_as_of,last_fit_problem,spend_curves,spend_curve_detail,spend_curve_own_share,cost_curve_months,cost_curve_ok,event_types_own,event_types,ltv_status,channel_tests';
 const V3_LEARN_Q = (sb, b) => Promise.all([
-  sb.from('vw_brand_learning_status').select('profile_as_of,last_fit_problem,spend_curves,spend_curve_detail,spend_curve_own_share,cost_curve_months,cost_curve_ok,event_types_own,event_types,ltv_status,channel_tests').eq('brand_id', b).limit(1),
+  sb.from('cache_brand_learning_status').select(V3_LEARN_COLS).eq('brand_id', b).limit(1)
+    .then(c => (c && !c.error && c.data && c.data[0] ? c : sb.from('vw_brand_learning_status').select(V3_LEARN_COLS).eq('brand_id', b).limit(1)),
+          () => sb.from('vw_brand_learning_status').select(V3_LEARN_COLS).eq('brand_id', b).limit(1)),
   sb.from('vw_action_track_record').select('profile,graded,hits').eq('brand_id', b),
   sb.from('vw_event_lift_learned').select('row_group,measured_weight').eq('brand_id', b),
 ]).then(rs => { const e = rs.find(r => r && r.error); return e ? { error: e.error } : { data: [{ s: (rs[0].data || [])[0] || null, tr: rs[1].data || [], ev: rs[2].data || [] }] }; });
