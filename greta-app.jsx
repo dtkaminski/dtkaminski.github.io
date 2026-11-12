@@ -24806,6 +24806,9 @@ function V3GoalLead() {
   const [drv, setDrv] = React.useState(null);
   const [goalBasis, setGoalBasis] = React.useState(false);
   // the media agency fee in the cost profile is an other marketing cost too (0505)
+  // 12 Nov re-eval: a goal that has ended is said, not shown as if none was ever set (Tranquillity's ended 30 Sep)
+  const lastG = useV3Rows('goal-last-ended', (sb, b) => sb.from('mos_business_goal').select('period_end').eq('brand_id', b).lt('period_end', new Date().toISOString().slice(0, 10)).order('period_end', { ascending: false }).limit(1));
+  const endedOn = !g && lastG.rows && lastG.rows[0] && lastG.rows[0].period_end ? v3Day(lastG.rows[0].period_end, true) : null;
   const feeG = useV3Rows('cost-profile-fee', (sb, b) => sb.from('brand_cost_profile').select('agency_fee_per_month').eq('brand_id', b).order('effective_from', { ascending: false }).limit(1));
   const nr = useV3Rows('goal-nr-' + per.start, V3_GOAL_NR_Q(per.start, today));
   const ph0 = useV3Rows('goal-phasing', V3_GOAL_PHASING_Q);
@@ -24822,7 +24825,7 @@ function V3GoalLead() {
   if (!P) return (<section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
     <div className="v3-home-group" style={{ '--n': 2 }}><div className="v3-home-group-h">Sales<span>This quarter</span></div>
       <div className="v3-home-tiles">
-        <V3HomeTile k="Goal" v={tgt ? v3GbpRound(tgt) : FMT_NONE} delta={g ? '' : 'None set yet'}/>
+        <V3HomeTile k="Goal" v={tgt ? v3GbpRound(tgt) : FMT_NONE} delta={g ? '' : endedOn ? 'Last one ended ' + endedOn : 'None set yet'}/>
         <V3HomeTile k="So far" v={done != null ? fmtMoney(done) : FMT_NONE} delta=""/>
       </div></div>
     <p className="v3-panel-note v3-goal-full">A full month of sales is needed to read where the quarter will end up.</p>
@@ -24960,7 +24963,7 @@ function V3GoalLead() {
           {g && unreach ? <V3HomeTile k={onConf ? 'Re-plan reach' : 'Most the plan reaches'} v={v3GbpRound(reachBest)} delta={v3GbpRound(tgt - reachBest) + ' short of the goal' + (onConf ? ', on today’s figures' : '')}/>
             : g && adsGoal != null ? <V3HomeTile k={onConf ? 'Re-plan ads' : 'The goal takes'} v={v3GbpRound(adsGoal)} delta={onConf ? 'for the goal, on today’s figures' : ph ? v3GbpRound(peak.gSpend) + ' in ' + gpMonthName(peak.iso) : ''}/> : null}
         </div></div>
-      {!g && <div className="v3-panel-note v3-goal-call v3-goal-full"><span>No goal confirmed yet.</span>{setGoal}</div>}
+      {!g && <div className="v3-panel-note v3-goal-call v3-goal-full"><span>{endedOn ? 'Your last goal ended ' + endedOn + '. None is set for this quarter.' : 'No goal confirmed yet.'}</span>{setGoal}</div>}
       {/* 12 Nov re-eval: the goal and its plan are both before other marketing costs; Home's profit after ads takes them off (Halden 79,516 against 90,576 for the same 30 days) */}
       {GV && ((C.other_marketing_none !== true && [C.creator_commission_pct, C.creator_commission_per_order, C.creator_agency_fees_monthly, C.seeding_cost_monthly].some(x => Number(x) > 0)) || Number(((feeG.rows || [])[0] || {}).agency_fee_per_month) > 0)
         && <p className="v3-panel-note v3-goal-full">The goal and its plan count profit after ads and before your other marketing costs (agency and creator fees, creator commission, seeding). Home takes those off as well, so its 30-day figure is lower.</p>}
