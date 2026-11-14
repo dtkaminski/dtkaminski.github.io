@@ -24931,7 +24931,11 @@ function V3GoalLead() {
   const paceMo = {}; (P.months || []).forEach(m => { paceMo[String(m.month).slice(0, 7)] = m; });
   const rows = (ph || P.months || []).map(m => { const k = String(m.month).slice(0, 7), p = paceMo[k] || {};
     return { iso: String(m.month).slice(0, 10), goal: ph ? Number(m.sales) : null, gSpend: ph ? Number(m.spend) : null, pace: Number(p.sales), atPace: paceAt(k), pSpend: Number(p.spend), x: ph && maxSeen ? Number(m.spend) / maxSeen : null }; });
-  const peak = ph ? rows.slice().sort((a, b) => b.gSpend - a.gSpend)[0] : rows.slice().sort((a, b) => b.pace - a.pace)[0];
+  // 14 Nov: the biggest month still to run. On 14 Nov frkl's checks read "Plan October's ads" and "Stock for October":
+  // with November and December worked down, October, already over, had the most ads.
+  const rowsLive = rows.filter(r => String(r.iso).slice(0, 7) >= String(today).slice(0, 7));
+  const rowsPk = rowsLive.length ? rowsLive : rows;
+  const peak = ph ? rowsPk.slice().sort((a, b) => b.gSpend - a.gSpend)[0] : rowsPk.slice().sort((a, b) => b.pace - a.pace)[0];
   // The goal's plan is the one fn_plan_for picks when the goal has a sales target, so its quarter figures are the
   // registered plan_quarter_* (1080). P beside a goal is a scenario at today's ad spend: not a registered figure.
   // Without a registered plan the goal row's own stored figures stand (read, not worked out).
@@ -24998,11 +25002,14 @@ function V3GoalLead() {
 
   // What reaching it takes, each with its figure
   const checks = [];
-  if (g && unreach) checks.push({ k: 'reach', t: 'Goal past what the plan reaches', sub: reachGoal ? 'A goal near ' + v3GbpRound(reachGoal) + ' is one the plan can reach.' : '',
-    fig: 'Most the plan lands ' + v3GbpRound(reachBest) + (best ? ', at ' + v3GbpRound(best) + ' of ads' : '') + (lySales ? '. Last year ' + fmtMoney(lySales) : '') });
+  // 14 Nov (Dan: the confirmed plan is the yardstick): beside a confirmed plan, these figures are that plan worked
+  // out again on today's figures, and say so. "Most the plan lands 71k" sat under "Plan lands 127k".
+  const reWord = onConf ? 're-worked plan' : 'plan';
+  if (g && unreach) checks.push({ k: 'reach', t: 'Goal past what the ' + reWord + ' reaches', sub: reachGoal ? 'A goal near ' + v3GbpRound(reachGoal) + ' is one the ' + reWord + ' can reach.' : '',
+    fig: 'Most the ' + reWord + ' lands ' + v3GbpRound(reachBest) + (best ? ', at ' + v3GbpRound(best) + ' of ads' : '') + (lySales ? '. Last year ' + fmtMoney(lySales) : '') });
   if (g && ph) checks.push({ k: 'ads', t: 'Plan ' + gpMonthName(peak.iso) + '’s ads',
     sub: mc > 0 && fop > 0 ? 'At that spend the last new customers cost ' + v3GbpRound(mc) + ' each. A first order makes ' + v3GbpRound(fop) + (ltv ? ', ' + v3GbpRound(ltv) + ' over a year' : '') + '.' : '',
-    fig: v3GbpRound(peak.gSpend) + (peak.x != null ? ', ' + fmtTimes(peak.x, 1) + ' your biggest month' : '') });
+    fig: v3GbpRound(peak.gSpend) + (peak.x != null ? ', ' + fmtTimes(peak.x, 1) + ' your biggest month' : '') + (onConf ? ', worked out again on today’s figures' : '') });
   if (g) {
     const wait = L.entered ? L.weeks + ' weeks from order to arrival' : L.days + ' days from order to arrival, assumed until you add yours';
     if (PDG && SQG.peak) {
@@ -25010,6 +25017,12 @@ function V3GoalLead() {
       const lands = SQG.lands_on ? String(SQG.lands_on).slice(0, 10) : arrive;
       checks.push({ k: 'stock', t: 'Stock for ' + pn, sub: wait + '.', go: ['stock', 'Open Stock & orders'],
         fig: 'In by ' + v3Day(PDG.deadline) + '. An order today arrives ' + v3Day(lands) + (lands > pEnd ? ', after it ends, so it all sells from stock you hold' : lands > PDG.deadline ? ', so most of it sells from stock you hold' : ', in time if ordered by ' + v3Day(PDG.orderBy)) });
+    } else if (((stG.rows || [])[0] || {}).peak && ((stG.rows || [])[0] || {}).peak.start) {
+      // 14 Nov: inside the peak's last week the stock list no longer plans for it (its stock deadline has passed),
+      // and this fell back to a month name ("Stock for October" on 14 Nov). The peak itself is still known (1267).
+      const pk = (stG.rows || [])[0].peak, ps = String(pk.start).slice(0, 10), pe = String(pk.end || pk.start).slice(0, 10);
+      checks.push({ k: 'stock', t: 'Stock for ' + v3PlainWords(pk.title || 'the peak'), sub: wait + '.', go: ['stock', 'Open Stock & orders'],
+        fig: 'It starts ' + v3Day(ps) + '. An order today arrives ' + v3Day(arrive) + (arrive > pe ? ', after it ends, so it all sells from stock you hold' : arrive > ps ? ', part way through it' : ', before it starts') });
     } else checks.push({ k: 'stock', t: 'Stock for ' + gpMonthName(peak.iso), sub: wait + '.', go: ['stock', 'Open Stock & orders'],
       fig: 'An order today arrives ' + v3Day(arrive) + (arrive > peakEnd ? ', after the month ends' : arrive > peak.iso ? ', part way through the month' : ', in time if ordered by ' + v3Day(v3IsoAdd(peak.iso, -L.days))) });
     if (C.cash_floor == null) checks.push({ k: 'cash', t: 'Add a minimum cash balance', sub: 'The ads and the stock are paid for before the sales arrive.', fig: 'Not entered', go: ['goal', 'Add it', 'economics'] });
@@ -25104,7 +25117,7 @@ function V3GoalLead() {
         </tbody>
       </table></div>
       {ph && maxSeen && rows.some(r => r.x > 1.5) && <p className="v3-panel-note">Past 1.5× your biggest month, the estimate goes beyond any spend seen so far.</p>}
-      {bs && ph && <p className="v3-panel-note">In the goal: {v3AdBudgetWords(bs, v3GbpRound).replace(/(^|, )([A-Z])/g, (m, a, c) => a + c.toLowerCase())}.{(() => { const AD = stAD.rows && stAD.rows[0] && stAD.rows[0].ad_decision; return AD && AD.decision === 'down' && Number(AD.hold_week) > 0 ? ' Spend near ' + v3GbpRound(AD.hold_week) + ' a week: the budget is a most, not a target.' : null; })()}</p>}
+      {bs && ph && <p className="v3-panel-note">{onConf ? 'Worked out again on today’s figures: ' : 'In the goal: '}{v3AdBudgetWords(bs, v3GbpRound).replace(/(^|, )([A-Z])/g, (m, a, c) => a + c.toLowerCase())}.{(() => { const AD = stAD.rows && stAD.rows[0] && stAD.rows[0].ad_decision; return AD && AD.decision === 'down' && Number(AD.hold_week) > 0 ? ' Spend near ' + v3GbpRound(AD.hold_week) + ' a week: the budget is a most, not a target.' : null; })()}</p>}
       {exp != null && <div className="v3-panel-note"><V3FcErr/></div>}
     </section>
   </>);
@@ -25248,7 +25261,7 @@ function V3GoalCash() {
   const figQ = useV3Figures();   // peak_cash_need and slow_stock from their owners (1080)
   const goalQ = useV3Rows('goal-active', V3_GOAL_Q);
   const [basis, setBasis] = React.useState(false);
-  const onGoal = !!(goalQ.rows && goalQ.rows[0] && Number(goalQ.rows[0].revenue_target) > 0), planWords = onGoal ? 'on the plan for your sales goal' : 'on the plan';
+  const onGoal = !!(goalQ.rows && goalQ.rows[0] && Number(goalQ.rows[0].revenue_target) > 0), planWords = onGoal ? (goalQ.rows[0].confirmed === true ? 'on your plan, worked out again on today’s figures' : 'on the plan for your sales goal') : 'on the plan';
   const C = q.rows && q.rows[0] && q.rows[0].cash_to_peak;
   const has = !!(C && C.said);
   const n = v => (v == null || !isFinite(Number(v)) ? null : Number(v));
