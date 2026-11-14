@@ -26995,6 +26995,9 @@ function V3BusinessState({ part }) {
   if (topCode)
     items.push({ k: 'Your best source of new customers',
       t: <>The discount code <b>{topCode.code}</b>, not an ad platform. It brought {fmtCount(topCode.orders_365d)} orders in the last year, {fmtPctN(num(topCode.first_order_share))} of them from first-time buyers, at {fmtPctN(num(topCode.avg_depth))} off on average.</> });
+  if (S.peak_now && S.peak_now.title)
+    items.push({ k: 'Your busy period',
+      t: <>{v3PlainWords(S.peak_now.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '')} is under way: day {fmtCount(num(S.peak_now.day_no))} of {fmtCount(num(S.peak_now.days))}. The same days last year sold {fmtMoney(num(S.peak_now.ly_sales))}.</> });
   if (P && P.title)
     items.push({ k: 'Your next busy period',
       t: <>It is {fmtCount(P.days_away)} days until {v3PlainWords(P.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '')}. The same days last year sold {fmtMoney(num(P.ly_sales))}{P.top_codes && P.top_codes[0] && num(P.ly_orders) > 0 ? <>, and {P.top_codes[0].code} brought {fmtPctN(num(P.top_codes[0].orders) / num(P.ly_orders))} of those orders</> : null}.</> });
@@ -27334,7 +27337,8 @@ function V3CalendarStrip() {
   // the record behind the forward figures, kept beside them (vw_forecast_error_30d); too few days and there is no figure to show
   const Fe = fe.rows && fe.rows[0];
   const wape = Fe && Fe.wape != null && isFinite(Number(Fe.wape)) && Number(Fe.days) >= 14 ? Number(Fe.wape) : null;
-  const Pk = stQ.rows && stQ.rows[0] && stQ.rows[0].peak;
+  // 14 Nov (1268): a peak under way is state.peak_now; it comes first, so the tiles stay through the peak itself
+  const Pk = stQ.rows && stQ.rows[0] && (stQ.rows[0].peak_now || stQ.rows[0].peak);
   const pkDays = Pk && Pk.days_away != null ? Number(Pk.days_away) : null;
   const pkLy = Pk && Number(Pk.ly_sales) > 0 ? Number(Pk.ly_sales) : null;
   const nMonth = hasMonth ? 2 + (S.plan_total != null ? 1 : 0) + (wape != null ? 1 : 0) + (!goalOn && Pa && Pa.status ? 1 : 0) : 0;
@@ -27362,7 +27366,9 @@ function V3CalendarStrip() {
     {Pk && <div className="v3-home-group" style={{ '--n': pkLy != null ? 2 : 1 }}>
       <div className="v3-home-group-h">{Pk.title || 'Next peak'}<span>{v3Day(String(Pk.start).slice(0, 10))} – {v3Day(String(Pk.end).slice(0, 10))}</span></div>
       <div className="v3-home-tiles">
-        <V3HomeTile k="Starts in" v={pkDays > 0 ? fmtCount(pkDays) + (pkDays === 1 ? ' day' : ' days') : 'Under way'} delta={v3Day(String(Pk.start).slice(0, 10))}/>
+        {Pk.days_left != null
+          ? <V3HomeTile k="Under way" v={'Day ' + fmtCount(Number(Pk.day_no)) + ' of ' + fmtCount(Number(Pk.days))} delta={fmtCount(Number(Pk.days_left)) + (Number(Pk.days_left) === 1 ? ' day left' : ' days left')}/>
+          : <V3HomeTile k="Starts in" v={pkDays > 0 ? fmtCount(pkDays) + (pkDays === 1 ? ' day' : ' days') : 'Under way'} delta={v3Day(String(Pk.start).slice(0, 10))}/>}
         {pkLy != null && <V3HomeTile k="Same days last year" v={fmtMoney(pkLy)} delta={Number(Pk.ratio) > 0 ? v3Dp1Num(Number(Pk.ratio)) + '× a normal pace' : ''}/>}
       </div></div>}
     {open && hasMonth && <div className="v3-home-drv v3-goal-full"><V3DriverPanel fixed={v3ModelCalendar(A, P, { range, month: gpMonthName(M.start), goal: goalOn })}/></div>}
