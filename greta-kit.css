@@ -1447,6 +1447,20 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   .v3-res-row { grid-template-columns: minmax(0, 1fr); }
   .v3-res-chip { justify-self: start; white-space: normal; }
 }
+/* 1279: the quarter's tally (Results, and Home's Results panel), and the Checked / Being checked groups */
+.v3-res-tally { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3) var(--space-5); margin: var(--space-2) 0 var(--space-3); }
+.v3-res-tally > div { min-width: 0; }
+.v3-res-tally dt { font-family: var(--font-sans); font-size: var(--text-xs); color: var(--color-muted); }
+.v3-res-tally dd { margin: 0; font-family: var(--font-figure); font-variant-numeric: tabular-nums; font-size: var(--text-lg);
+                   font-weight: var(--weight-semi); color: var(--color-ink); }
+.v3-home-results .v3-res-tally { margin: 0; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-line); }
+.v3-res-group { margin-top: var(--space-5); }
+@media (max-width: 760px) { .v3-res-tally { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* 1279: a toast's one action (Undo after Done) */
+.toast .t-act { align-self: center; padding: var(--space-1) var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-md);
+                background: var(--color-panel); color: var(--color-ink); font-family: var(--font-sans); font-size: var(--text-sm);
+                font-weight: var(--weight-semi); cursor: pointer; }
+.toast .t-act:hover { border-color: var(--color-ink); }
 .v3-rank-row.v3-rank-card { display: block; padding: 0; border-top: 0; }
 @media (max-width: 760px) {
   .v3-goal-figs dd { font-size: var(--text-lg); }

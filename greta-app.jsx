@@ -2339,7 +2339,8 @@ function ToastHost(){
       const id = 'to'+Math.random().toString(36).slice(2);
       const kind = opts.kind || 'info';
       const ic = opts.icon || (kind==='good'?'checkCircle':kind==='bad'?'alert':kind==='warn'?'alert':'info');
-      setItems(x => [...x, {id, title:msg, body:opts.body, kind, ic}]);
+      // 1279: opts.action {label, run}, one button (Undo after Done)
+      setItems(x => [...x, {id, title:msg, body:opts.body, kind, ic, action: opts.action && opts.action.label && typeof opts.action.run === 'function' ? opts.action : null}]);
       const ttl = opts.ttl==null ? 3400 : opts.ttl;
       if(ttl>0) setTimeout(()=> setItems(x => x.filter(t=>t.id!==id)), ttl);
     };
@@ -2354,6 +2355,7 @@ function ToastHost(){
         <div className="t-title">{t.title}</div>
         {t.body && <div className="t-body">{t.body}</div>}
       </div>
+      {t.action && <button type="button" className="t-act" onClick={()=>{ dismiss(t.id); try{ t.action.run(); }catch(e){} }}>{t.action.label}</button>}
       <button className="t-x" onClick={()=>dismiss(t.id)} aria-label="Dismiss">×</button>
     </div>))}</div>);
 }
@@ -11527,8 +11529,19 @@ function v3BoardLoad(){
 // Closing a row anywhere closes it everywhere: the badge, Today's list and the board agree.
 function v3BoardDrop(ext){
   if (!V3_BOARD.rows) return;
+  // 1279: kept, with its place, so an Undo puts it back where it was
+  const i = V3_BOARD.rows.findIndex(x => x.external_id === ext), j = V3_BOARD.unpriced ? V3_BOARD.unpriced.findIndex(x => x.external_id === ext) : -1;
+  if (i >= 0 || j >= 0) (V3_BOARD.dropped = V3_BOARD.dropped || {})[ext] = { row: i >= 0 ? V3_BOARD.rows[i] : null, i, lane: j >= 0 ? V3_BOARD.unpriced[j] : null, j };
   V3_BOARD.rows = V3_BOARD.rows.filter(x => x.external_id !== ext);
   if (V3_BOARD.unpriced) V3_BOARD.unpriced = V3_BOARD.unpriced.filter(x => x.external_id !== ext);
+  v3BoardNotify();
+}
+function v3BoardRestore(ext){
+  const d = V3_BOARD.dropped && V3_BOARD.dropped[ext];
+  if (!d) return;
+  delete V3_BOARD.dropped[ext];
+  if (d.row && V3_BOARD.rows && !V3_BOARD.rows.some(x => x.external_id === ext)) V3_BOARD.rows.splice(Math.min(d.i, V3_BOARD.rows.length), 0, d.row);
+  if (d.lane && V3_BOARD.unpriced && !V3_BOARD.unpriced.some(x => x.external_id === ext)) V3_BOARD.unpriced.splice(Math.min(d.j, V3_BOARD.unpriced.length), 0, d.lane);
   v3BoardNotify();
 }
 function useV3Board(){
@@ -18528,6 +18541,57 @@ async function v3Decide(ext, decision, until, reason) {
   try { track('move_decided', { external_id: ext, decision }, 'moves'); } catch (e) {}
   return r.data;
 }
+// 1279 (17 Nov eval, 5.3): pressing Done said nothing, gave no check date and had no undo; the row vanished. Done now
+// says when it is checked, from the server (fn_action_decide's check: the date the follow-up's check will carry), and
+// the toast carries an Undo while the row waits to leave.
+function v3DayNear(iso) { return v3Day(iso, String(iso || '').slice(0, 4) !== String(new Date().getFullYear())); }
+function v3DoneWhen(chk) {
+  if (!chk || !chk.due_on) return 'It names no figure to check, so Results keeps it without a grade.';
+  const due = v3DayNear(chk.due_on), w = Number(chk.window_days) > 0 ? v3DayCount(Number(chk.window_days)) : null;
+  if (chk.waits_for === 'restock')
+    return 'Checked once the stock is in' + (chk.expect_by ? ' (due ' + v3DayNear(chk.expect_by) + ')' : '') + (w ? ', over ' + w : '') + ': ' + due + ' at the earliest.';
+  if (chk.waits_for)
+    return 'Checked once the spend has come down' + (chk.expect_by ? ' (by ' + v3DayNear(chk.expect_by) + ')' : '') + (w ? ', over ' + w : '') + ': ' + due + ' at the earliest.';
+  return 'Checked on ' + due + (w ? ', after ' + w : '') + '.';
+}
+const V3_DONE_DROP = {};
+// the row leaves the lists 1.6 s after Done, unless Undo comes first
+function v3DropAfterDone(ext, after) {
+  clearTimeout(V3_DONE_DROP[ext]);
+  V3_DONE_DROP[ext] = setTimeout(() => { delete V3_DONE_DROP[ext]; v3BoardDrop(ext); v3QRefresh(V3_MOVE_KEYS); if (after) after(); }, 1600);
+}
+async function v3UndoDone(ext, wasDoing) {
+  try {
+    if (V3_DONE_DROP[ext]) { clearTimeout(V3_DONE_DROP[ext]); delete V3_DONE_DROP[ext]; }
+    await v3Decide(ext, 'reopen');
+    // a move taken on goes back to Doing, with the person who undid it
+    if (wasDoing) {
+      await v3Decide(ext, 'do');
+      const uid = v3Uid();
+      if (uid) { try { await v3Assign(ext, 'user:' + uid, null); } catch (e) {} }
+    }
+    v3BoardRestore(ext);
+    v3QRefresh(V3_MOVE_KEYS);
+    try { window.dispatchEvent(new CustomEvent('v3-undone', { detail: { ext, wasDoing: !!wasDoing } })); } catch (e) {}
+    toast('Back on the list', { body: wasDoing ? 'Status: Doing.' : 'Status: To do.' });
+  } catch (e) { toast('Could not undo', { kind: 'warn', body: String((e && e.message) || e) }); }
+}
+// the toast after Done; returns the sentence for the row
+function v3AfterDone(ext, res, wasDoing, title) {
+  const when = v3DoneWhen(res && res.check);
+  toast('Marked done', { kind: 'good', body: (title ? title + '. ' : '') + when, ttl: 10000,
+    action: { label: 'Undo', run: () => v3UndoDone(ext, wasDoing) } });
+  return when;
+}
+// a card or row that showed Done goes back when Undo is pressed
+function useV3Undone(ext, onUndone) {
+  React.useEffect(() => {
+    if (!ext) return undefined;
+    const f = e => { if (e && e.detail && e.detail.ext === ext) onUndone(e.detail); };
+    window.addEventListener('v3-undone', f);
+    return () => window.removeEventListener('v3-undone', f);
+  }, [ext]);
+}
 // 1141: what an owner tells Greta goes to the server (fn_feedback_add) and from there into Dan's morning email
 // (send-feedback-digest). Not now and Dismiss reasons already travel with the decision (fn_action_decide) and the
 // same email reads them; the chips only make a reason one click. Viewers can send feedback too: it is not an edit.
@@ -18742,6 +18806,7 @@ function V3MoveDecide({ row, small, onDecided, startMode, named, covers, rank })
   const [pick, setPick] = React.useState('');      // a reason chip (1141)
   const [sent, setSent] = React.useState(false);   // "something looks wrong" went to the server
   const [moreOpen, setMoreOpen] = React.useState(false);   // Dismiss and "something looks wrong", one press away
+  useV3Undone(ext, d => { setSaid(null); setMine(d.wasDoing ? true : false); });   // 1279
   if (!ext) return null;
   // A dead feed is a fact Greta checks, not a choice: the only move is to reconnect it.
   if (connProvider(ext)) return <div className="v3-mv-btns"><V3Fix provider={connProvider(ext)} small={small}/></div>;
@@ -18752,8 +18817,13 @@ function V3MoveDecide({ row, small, onDecided, startMode, named, covers, rank })
     if (decision === 'do' && place) { try { window.open(place.url, '_blank', 'noopener'); } catch (e) {} }
     setBusy(true); setErr('');
     try {
-      await v3Decide(ext, decision, decision === 'not_now' ? until : null, [pick, reason.trim()].filter(Boolean).join('. ') || null);
-      if (decision === 'do') {
+      const res = await v3Decide(ext, decision, decision === 'not_now' ? until : null, [pick, reason.trim()].filter(Boolean).join('. ') || null);
+      if (decision === 'done') {
+        // 1279: Done says when it is checked; the toast carries an Undo until the row leaves
+        setSaid('Marked done. ' + v3AfterDone(ext, res, accepted, named ? null : title));
+        v3DropAfterDone(ext, () => { if (onDecided) onDecided('done'); });
+      }
+      else if (decision === 'do') {
         // whoever takes a move on has it until they give it to someone else (1112); one already given keeps its owner
         const uid = v3Uid();
         if (uid && !(bmRow && bmRow.assignee)) { try { await v3Assign(ext, 'user:' + uid, null); } catch (e) {} }
@@ -18761,8 +18831,7 @@ function V3MoveDecide({ row, small, onDecided, startMode, named, covers, rank })
         v3QRefresh(V3_MOVE_KEYS);
       }
       else {
-        setSaid(decision === 'done' ? 'Marked done. The result shows on Results once it is checked.'
-          : decision === 'not_now' ? 'Put off until ' + v3Day(until, true) + '. It comes back then, sooner only if it gets much bigger.'
+        setSaid(decision === 'not_now' ? 'Put off until ' + v3Day(until, true) + '. It comes back then, sooner only if it gets much bigger.'
           : 'Dismissed. It stays off the list for 30 days unless it gets much bigger.');
         // every page that shows this move follows: the goal's shares, the totals, the alerts, Results
         setTimeout(() => { v3BoardDrop(ext); v3QRefresh(V3_MOVE_KEYS); if (onDecided) onDecided(decision); }, 1600);
@@ -20374,7 +20443,9 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
   const [mine, setMine] = React.useState(null);   // what this row just did, until the server's rows catch up
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
+  const [doneWhen, setDoneWhen] = React.useState('');   // 1279: when the move just marked done is checked
   React.useEffect(() => { setMine(null); }, [taken]);
+  useV3Undone(ext, d => { setMine(d.wasDoing ? 'doing' : 'todo'); setDoneWhen(''); });
   // 11 Nov walk-through: every "Open …" button landed at the top of its page, not on the action it was about. The button
   // passes the action's id; the same action's row on the page it opens (Website, Marketing, Products, Customers, Goal)
   // scrolls into view and is marked for a moment. A page without the row stays at its top, as before.
@@ -20430,9 +20501,11 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
         await v3Decide(ext, 'reopen');
         setMine('todo'); v3QRefresh(V3_MOVE_KEYS);
       } else if (to === 'done') {
-        await v3Decide(ext, 'done');
+        // 1279: Done says when it is checked; the toast carries an Undo until the row leaves
+        const res = await v3Decide(ext, 'done');
         setMine('done');
-        setTimeout(() => { v3BoardDrop(ext); v3QRefresh(V3_MOVE_KEYS); }, 1600);
+        setDoneWhen(v3AfterDone(ext, res, status === 'doing', pa.title));
+        v3DropAfterDone(ext);
       }
     } catch (x) { setErr(String((x && x.message) || x)); }
     setBusy(false);
@@ -20442,7 +20515,7 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
       {wide && <span className="v3-home-n">{rank != null ? rank : ''}</span>}
       <div className="v3-home-act-b">
       <button type="button" className="v3-home-title" title={wide ? pa.title : undefined} onClick={() => onOpen(null)}>{wide ? v3SplitTitle(pa.title)[0] : pa.title}</button>
-      {status === 'done' ? <span className="v3-home-sub">Marked done. The result shows on Results once it is checked.</span>
+      {status === 'done' ? <span className="v3-home-sub" role="status">Marked done. {doneWhen || 'The result shows on Results once it is checked.'}</span>
         : wide && row.lane_said ? <span className="v3-home-sub">{v3Tidy(row.lane_said)}</span>
         : cause ? <span className="v3-home-sub">{cause}</span> : null}
       {others > 0 && <span className="v3-home-sub">{others === 1 ? '1 more step' : others + ' more steps'}</span>}
@@ -20610,6 +20683,27 @@ function V3HomeProfit({ L }) {
     </tr>))}</tbody></table>
   </section>);
 }
+// 1279: the quarter's tally (fn_brand_results totals.quarter, by the day each move was marked done): moves done, how
+// many worked, how many are still being checked, and the profit measured from them. Measured shows a dash until a
+// check has read profit in pounds.
+function V3ResTally({ q }) {
+  if (!q) return null;
+  const cells = [
+    ['Moves done', fmtCount(Number(q.done) || 0)],
+    ['Worked', fmtCount(Number(q.worked) || 0)],
+    ['Being checked', fmtCount(Number(q.being_checked) || 0)],
+    ['Measured', Number(q.measured_moves) > 0 ? v3Gbp(q.measured_gbp) : FMT_NONE],
+  ];
+  return (<dl className="v3-res-tally" aria-label={'This quarter, from ' + v3Day(q.from)}>
+    {cells.map(c => <div key={c[0]}><dt>{c[0]}</dt><dd>{c[1]}</dd></div>)}</dl>);
+}
+const V3_RES_BEING = new Set(['too_early', 'checking', 'waiting']);
+// a done move's chip: the check date while its window runs (the date Done gave), else its label
+function v3ResChip(r) {
+  const L = V3_RESULT[r.label] || V3_RESULT.cant_tell;
+  if (r.label === 'too_early' && r.due_on) return { label: 'Checks ' + v3DayNear(String(r.due_on).slice(0, 10)), cls: '' };
+  return L;
+}
 // "Did it work": the one scorer, or the date each of the top actions would be read back.
 function V3HomeResults({ q, board }) {
   const res = useV3Rows('brand-results', V3_RESULTS_Q);
@@ -20622,12 +20716,15 @@ function V3HomeResults({ q, board }) {
   const due = moves.map(m => { const ex = v3MoveExtra(m.row.external_id); return ex && Number(ex.win) > 0 ? { id: m.row.external_id, k: v3PlainAction(Object.assign({}, m.row, { plan: null })).title, on: v3IsoAdd(todayIso, Number(ex.win)) } : null; })
     .filter(Boolean).sort((a, b) => a.on.localeCompare(b.on));
   const pillOf = { good: 'v3-pill-good', bad: 'v3-pill-bad', '': 'v3-pill-none' };
+  // 1279: the quarter's tally heads the panel once a move has been done this quarter
+  const Q = R && R.totals && R.totals.quarter && Number(R.totals.quarter.done) > 0 ? R.totals.quarter : null;
   return (<section className="v3-panel v3-home-results">
-    <div className="v3-panel-head"><h2>Results</h2><span className="v3-muted">Actions you marked done</span>
+    <div className="v3-panel-head"><h2>Results</h2><span className="v3-muted">{Q ? 'This quarter' : 'Moves marked done'}</span>
       <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('results')}>View all</button></div>
-    {done.length > 0 ? <table className="v3-home-pl v3-home-res"><tbody>{done.map(r => { const lab = V3_RESULT[r.label] || V3_RESULT.checking, soon = r.due_on && String(r.due_on).slice(0, 10) >= todayIso;
+    {Q && <V3ResTally q={Q}/>}
+    {done.length > 0 ? <table className="v3-home-pl v3-home-res"><tbody>{done.map(r => { const lab = v3ResChip(r), soon = r.label === 'too_early';
         return (<tr key={r.external_id}><td>{v3MoveShort(r)}</td>
-          <td><span className={'v3-pill ' + (soon ? 'v3-pill-none' : pillOf[lab.cls || ''])}>{soon ? 'Checks ' + v3Day(String(r.due_on).slice(0, 10)) : lab.label}</span></td>
+          <td><span className={'v3-pill ' + pillOf[lab.cls || '']}>{lab.label}</span></td>
           <td className="r">{!soon && r.measured_gbp != null ? v3Gbp(r.measured_gbp) : ''}</td></tr>); })}</tbody></table>
       : due.length > 0 ? <table className="v3-home-pl v3-home-res"><thead><tr><th>If started today</th><th className="r">Checked on</th></tr></thead>
           <tbody>{due.map(x => <tr key={x.id}><td>{x.k}</td><td className="r">{v3Day(x.on)}</td></tr>)}</tbody></table>
@@ -25639,7 +25736,7 @@ function v3ResultAmt(v, unit) {
 // 1229: a graded move reads on the measure its grade read ("Share of Meta spend on the top 5 ads"), not the old
 // promise's metric; `earlier` is a move from before the brand joined, which Greta did not price.
 function V3ResultRow({ r, earlier }) {
-  const L = V3_RESULT[r.label] || V3_RESULT.cant_tell;
+  const L = v3ResChip(r);   // 1279: a move whose window runs shows the date it is checked on
   const what = r.measure ? (/^[A-Z][a-z]/.test(r.measure) ? r.measure.charAt(0).toLowerCase() + r.measure.slice(1) : r.measure) : v3MetricWords(r.metric);
   const way = r.direction === 'down' ? 'down' : 'up';
   const hasExp = r.expect_p50 != null && Number(r.expect_p50) !== 0;
@@ -25651,7 +25748,7 @@ function V3ResultRow({ r, earlier }) {
       <p className="v3-res-t">{v3PlainAction({ external_id: r.external_id, description: r.description }).title}</p>
       <p className="v3-res-sub">Done {v3Day(r.done_on, true)}{a && a.kind === 'agency' && a.name ? ' by ' + a.name : ''}</p>
       <p className="v3-res-line">
-        <span className="v3-res-k">{earlier ? 'Expected' : 'Greta expected'}</span>
+        <span className="v3-res-k">Expected</span>
         {Number(r.gbp) > 0
           ? <>about <b className="v3-res-fig">{v3Gbp(r.gbp)}</b> {r.per === 'once' ? 'once' : 'a month'}{r.low_gbp != null && r.high_gbp != null && Number(r.high_gbp) > Number(r.low_gbp) ? <> (between {v3Gbp(r.low_gbp)} and {v3Gbp(r.high_gbp)})</> : null}{r.metric ? ', checked on ' : ''}</>
           : null}
@@ -25669,7 +25766,7 @@ function V3ResultRow({ r, earlier }) {
           </p>
         </>}
     </div>
-    <span className={'v3-pill v3-res-chip v3-pill-' + (L.cls || 'none')}>{L.label}{r.label === 'too_early' && r.days_left != null ? ': about ' + r.days_left + (r.days_left === 1 ? ' more day' : ' more days') : ''}</span>
+    <span className={'v3-pill v3-res-chip v3-pill-' + (L.cls || 'none')}>{L.label}</span>
   </li>);
 }
 function V3Results() {
@@ -25692,17 +25789,25 @@ function V3Results() {
     <p className="v3-note v3-measure">Mark an action done on Home or Actions. Each one is followed from that day: first until the change shows (stock in, spend down), then over its window against what would have happened anyway. The result shows here.</p>
     <button type="button" className="v3-btn v3-btn-sm v3-btn-p" onClick={() => window.__oiGo && window.__oiGo('today')}>Go to Home</button>
   </section>{earlierSec}</>);
-  const counts = ['worked', 'pointing', 'did_not_work', 'checking', 'too_early', 'waiting', 'not_in_place', 'cant_tell'].filter(k => Number(T[k]) > 0);
+  // 1279: a check that has not read yet is one state to the owner, being checked, whether its window runs or ended
+  const C = Object.assign({}, T, { being: (Number(T.checking) || 0) + (Number(T.too_early) || 0) });
+  const counts = [['worked', 'worked'], ['pointing', 'pointing the right way'], ['did_not_work', 'didn’t work'], ['being', 'being checked'],
+    ['waiting', 'not in place yet'], ['not_in_place', 'never in place'], ['cant_tell', 'can’t tell']].filter(k => Number(C[k[0]]) > 0);
+  const being = rows.filter(r => V3_RES_BEING.has(r.label)), checked = rows.filter(r => !V3_RES_BEING.has(r.label));
   return (<><section className="v3-sec v3-res">
     <div className="v3-kick">The moves you marked done</div>
     <p className="v3-verdict">Moves you took: <span className="v3-res-fig">{v3Gbp(T.predicted_month)}</span> a month predicted{Number(T.predicted_once) > 0 ? <>, and <span className="v3-res-fig">{v3Gbp(T.predicted_once)}</span> once</> : null}, <span className="v3-res-fig">{v3Gbp(T.measured_gbp)}</span> measured so far.</p>
-    <p className="v3-res-counts">{counts.map(k => <span key={k}><b className="v3-res-fig">{fmtCount(T[k])}</b> {V3_RESULT[k].label.toLowerCase()}</span>)}</p>
+    {T.quarter && Number(T.quarter.done) > 0 && <><div className="v3-kick v3-res-group">This quarter</div><V3ResTally q={T.quarter}/></>}
+    <p className="v3-res-counts">{counts.map(k => <span key={k[0]}><b className="v3-res-fig">{fmtCount(C[k[0]])}</b> {k[1]}</span>)}</p>
     <p className="v3-note v3-measure">
       {Number(T.measured_moves) > 0 ? 'Measured counts the ' + fmtCount(T.measured_moves) + (Number(T.measured_moves) === 1 ? ' move' : ' moves') + ' whose check reads profit in pounds. ' : 'Nothing is measured in pounds yet: a £ figure counts only once a check reads profit itself. '}
       {T.next_check ? 'The next check is due ' + v3Day(T.next_check, true) + '. ' : ''}
       Each check starts once the change has shown, and compares what happened with what would have happened anyway. It shows the promise held, not that the move alone caused it.
     </p>
-    <ul className="v3-res-list">{rows.map(r => <V3ResultRow key={r.external_id} r={r}/>)}</ul>
+    {checked.length > 0 && being.length > 0 && <div className="v3-kick v3-res-group">Checked</div>}
+    {checked.length > 0 && <ul className="v3-res-list">{checked.map(r => <V3ResultRow key={r.external_id} r={r}/>)}</ul>}
+    {being.length > 0 && <div className="v3-kick v3-res-group">Being checked</div>}
+    {being.length > 0 && <ul className="v3-res-list">{being.map(r => <V3ResultRow key={r.external_id} r={r}/>)}</ul>}
   </section>{earlierSec}</>);
 }
 // A finding's title is its own first line, not "Why X changed": the finding is in the text.
