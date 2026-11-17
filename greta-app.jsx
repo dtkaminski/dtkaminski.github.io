@@ -26751,7 +26751,130 @@ function V3Team() {
       <p className="micro muted v3-measure">They get an email with a sign-in link that opens this workspace. Only an owner can make someone an admin.</p>
     </section>)}
     {msg && <p className={msg.kind === 'ok' ? 'v3-note v3-ok' : 'v3-note v3-bad'} role="status">{msg.text}</p>}
+    {canManage && sb && b && <V3CustomerData sb={sb} b={b} isOwner={me.role === 'owner'} brandName={brandName}/>}
   </div>);
+}
+
+// ── Customer data (1282, 17 Nov) ─────────────────────────────────────────────────────────────────────
+// Take the workspace out, export or erase one shopper, answer Shopify's requests, delete the workspace (30 days,
+// cancellable), and how long each log is kept. Owner or admin; the delete is the owner's alone.
+const V3_DATA_KIND = { workspace_export: 'Workspace export', workspace_delete: 'Workspace delete', shopper_export: 'Shopper export',
+  shopper_erase: 'Shopper erase', shopify_purge: 'Store data removal' };
+const V3_DATA_STATUS = { scheduled: 'Scheduled', waiting_owner: 'Waiting for you', done: 'Done', cancelled: 'Cancelled', failed: 'Failed' };
+function v3SaveJson(name, data) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function V3CustomerData({ sb, b, isOwner, brandName }) {
+  const [info, setInfo] = React.useState(null), [shopper, setShopper] = React.useState('');
+  const [busy, setBusy] = React.useState(''), [note, setNote] = React.useState(null);
+  const today = () => new Date().toISOString().slice(0, 10);
+  const slug = String(brandName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workspace';
+  const load = async () => {
+    const r = await sb.rpc('fn_data_requests', { p_brand: b });
+    setInfo(r.error ? { error: r.error.message } : r.data);
+  };
+  React.useEffect(() => { load(); }, [b]);   // eslint-disable-line
+  const run = async (key, fn) => {
+    if (busy) return;
+    setBusy(key); setNote(null);
+    try { await fn(); } catch (e) { setNote({ kind: 'err', text: (e && e.message) || 'That did not go through.' }); }
+    setBusy(''); load();
+  };
+  const rpc = async (name, args) => { const r = await sb.rpc(name, args); if (r.error) throw new Error(r.error.message); return r.data; };
+  const exportWorkspace = () => run('ws', async () => {
+    v3SaveJson('greta-' + slug + '-' + today() + '.json', await rpc('fn_workspace_export', { p_brand: b }));
+    setNote({ kind: 'ok', text: 'Workspace saved as a JSON file.' });
+  });
+  const exportShopper = (requestId) => run(requestId ? 'req-' + requestId : 'sx', async () => {
+    const d = await rpc('fn_shopper_export', requestId ? { p_brand: b, p_request: requestId } : { p_brand: b, p_email: shopper.trim() });
+    const n = (d && d.orders && d.orders.length) || 0;
+    v3SaveJson('shopper-' + today() + '.json', d);
+    setNote({ kind: 'ok', text: n ? fmtCount(n) + (n === 1 ? ' order' : ' orders') + ' saved; send the file to the shopper.' : 'No orders under that email.' });
+  });
+  const eraseShopper = () => {
+    const e = shopper.trim();
+    if (!window.confirm('Erase ' + e + ' from ' + brandName + '?\n\nTheir email, phone, names and addresses are removed from every order. The orders stay in the figures under a stand-in email. This cannot be undone.')) return;
+    run('se', async () => {
+      const d = await rpc('fn_shopper_erase', { p_brand: b, p_email: e });
+      const n = (d && d.orders) || 0;
+      setShopper('');
+      setNote({ kind: 'ok', text: n ? 'Erased from ' + fmtCount(n) + (n === 1 ? ' order.' : ' orders.') : 'No orders under that email; a later order from it arrives erased.' });
+    });
+  };
+  const deleteWorkspace = () => {
+    if (!window.confirm('Delete ' + brandName + ' from Greta?\n\nEverything in Greta for it is deleted in 30 days: data from your connections, actions, decisions, plans and the team. You can cancel until then. Your store and ad accounts are not touched.')) return;
+    run('wd', async () => {
+      const d = await rpc('fn_workspace_delete_request', { p_brand: b });
+      setNote({ kind: 'ok', text: 'Deletes on ' + v3Day(String(d.due_at).slice(0, 10), true) + '.' });
+    });
+  };
+  const cancel = (id) => run('c-' + id, async () => {
+    const d = await rpc('fn_data_request_cancel', { p_brand: b, p_id: id });
+    setNote(d && d.cancelled ? { kind: 'ok', text: 'Delete cancelled.' } : { kind: 'err', text: 'Nothing to cancel.' });
+  });
+  if (!info) return <section className="v3-sec"><h2 className="v3-sec-title">Customer data</h2><V3SkeletonRows n={2}/></section>;
+  if (info.error) return (<section className="v3-sec"><h2 className="v3-sec-title">Customer data</h2>
+    <p className="v3-note v3-bad">{info.error}</p><button type="button" className="v3-btn v3-btn-sm" onClick={load}>Try again</button></section>);
+  const reqs = info.requests || [];
+  const pendingDelete = reqs.find(r => r.kind === 'workspace_delete' && r.status === 'scheduled');
+  const validEmail = /^[^@\s]+@[^@\s]+$/.test(shopper.trim());
+  return (<section className="v3-sec">
+    <h2 className="v3-sec-title">Customer data</h2>
+
+    <h3 className="v3-sub">Workspace export</h3>
+    <div className="v3-btn-row">
+      <button type="button" className="v3-btn v3-btn-sm" disabled={!!busy} onClick={exportWorkspace}>{busy === 'ws' ? 'Preparing…' : 'Download workspace'}</button>
+    </div>
+    <p className="micro muted v3-measure">Settings, goals, plans, actions, decisions, results, questions asked, the team and each connection’s name and state, as one JSON file. Keys and tokens are never included. Orders stay in Shopify.</p>
+
+    <h3 className="v3-sub">Shopper</h3>
+    <form className="v3-comp-add" onSubmit={e => { e.preventDefault(); if (validEmail) exportShopper(); }}>
+      <input className="v3-search" type="email" value={shopper} onChange={e => setShopper(e.target.value)} placeholder="shopper@example.com" aria-label="Shopper email" autoComplete="off"/>
+      <button type="submit" className="v3-btn v3-btn-sm" disabled={!!busy || !validEmail}>{busy === 'sx' ? 'Preparing…' : 'Export'}</button>
+      {!info.demo && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={!!busy || !validEmail} onClick={eraseShopper}>{busy === 'se' ? 'Erasing…' : 'Erase'}</button>}
+    </form>
+    <p className="micro muted v3-measure">Export saves every order under the email, with what was in it and the details the store holds, to send to the shopper. Erase removes their email, phone, names and addresses from those orders; the orders still count in sales and customers.{info.erased_shoppers ? ' ' + fmtCount(info.erased_shoppers) + (info.erased_shoppers === 1 ? ' shopper erased so far.' : ' shoppers erased so far.') : ''}</p>
+
+    {reqs.length > 0 && (<>
+      <h3 className="v3-sub">Requests</h3>
+      <table className="v3-rw">
+        <thead><tr><th className="t-text">Request</th><th className="t-text">From</th><th className="t-text">Status</th><th className="t-text">Asked</th><th className="t-text">Due</th><th>Orders</th><th/></tr></thead>
+        <tbody>{reqs.map(r => (<tr key={r.id}>
+          <td className="t-text">{V3_DATA_KIND[r.kind] || r.kind}</td>
+          <td className="t-text">{r.source === 'shopify' ? 'Shopify' : 'Your team'}</td>
+          <td className="t-text">{r.status === 'waiting_owner' ? <span className="v3-down">{V3_DATA_STATUS[r.status]}</span> : (V3_DATA_STATUS[r.status] || r.status)}</td>
+          <td className="t-text">{v3Day(String(r.requested_at).slice(0, 10), true)}</td>
+          <td className="t-text">{r.status === 'scheduled' && r.due_at ? v3Day(String(r.due_at).slice(0, 10), true)
+            : r.status === 'waiting_owner' ? v3Day(new Date(Date.parse(r.requested_at) + 30 * 864e5).toISOString().slice(0, 10), true) : FMT_NONE}</td>
+          <td>{r.orders == null ? FMT_NONE : fmtCount(r.orders)}</td>
+          <td><span className="v3-team-btns">
+            {r.status === 'waiting_owner' && r.kind === 'shopper_export' && <button type="button" className="v3-btn v3-btn-sm" disabled={!!busy} onClick={() => exportShopper(r.id)}>{busy === 'req-' + r.id ? 'Preparing…' : 'Export'}</button>}
+            {r.status === 'scheduled' && r.kind === 'workspace_delete' && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={!!busy} onClick={() => cancel(r.id)}>Cancel</button>}
+          </span></td>
+        </tr>))}</tbody>
+      </table>
+      <p className="micro muted v3-measure">Shopify passes on a shopper’s request for their data; export it and send the file to them within 30 days of the request.</p>
+    </>)}
+
+    <h3 className="v3-sub">Retention</h3>
+    <table className="v3-rw">
+      <thead><tr><th className="t-text">Log</th><th>Days</th></tr></thead>
+      <tbody>{(info.retention || []).map(x => (<tr key={x.what}><td className="t-text">{x.what}</td><td>{fmtCount(x.days)}</td></tr>))}</tbody>
+    </table>
+    <p className="micro muted v3-measure">Older entries are deleted each night. Orders, ad and email figures from your connections are kept while the workspace is.</p>
+
+    {isOwner && !info.demo && (<>
+      <h3 className="v3-sub">Workspace delete</h3>
+      {pendingDelete
+        ? <p className="v3-note">Deletes on {v3Day(String(pendingDelete.due_at).slice(0, 10), true)}. Cancel it under Requests.</p>
+        : <div className="v3-btn-row"><button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={!!busy} onClick={deleteWorkspace}>Delete workspace</button></div>}
+      <p className="micro muted v3-measure">Owner only. Runs 30 days after it is asked for and can be cancelled until then.</p>
+    </>)}
+    {note && <p className={note.kind === 'ok' ? 'v3-note v3-ok' : 'v3-note v3-bad'} role="status">{note.text}</p>}
+  </section>);
 }
 
 // ── Where the business stands (V3, 2026-10-05) ──────────────────────────────────────────────────────
