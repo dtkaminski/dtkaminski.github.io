@@ -17309,6 +17309,8 @@ function v3PlainAction(row){
   // A short instruction for every row the board ranks, the detail under it. Five of the thirteen rows
   // showed their whole paragraph as the title (7 Oct): the BFCM plan, the sales rhythm, the add-on, the
   // email flows and the free-shipping nudge read as walls of figures with nothing to scan.
+  // 1270: once the peak has started the row opens "<name> is under way"; the plan is then about the stock in hand
+  if (id === 'promo-peak-plan' && /^(.+?) (?:peak window )?is under way/.test(raw)) return P('Run ' + raw.match(/^(.+?) (?:peak window )?is under way/)[1].replace(/ peak window$/i, '') + ' on the stock you have: what to lead with and what to hold back', raw);
   if (id === 'promo-peak-plan') return P('Plan ' + ((raw.match(/^(.+?) (?:peak window )?starts in/) || [])[1] || 'the peak').replace(/ peak window$/i, '') + ' as one event: the code, the stock and the offer', raw);
   if (id === 'sales-rhythm') return P('Spend less on ads in the weeks between sales', raw);
   if (id === 'driver-meta-ads') return P(/^People click/.test(raw) ? 'Make new Meta ads: people click the current ones less' : 'Move Meta budget from older ads to the newer ones that sell for less', raw);
