@@ -17295,9 +17295,9 @@ function v3PlainAction(row){
     const was = m(/from (£[\d,]+) in the last 7 days(?: \(([^)]+)\))?/), times = (m(/ran at about ([\d.]+) times that/) || [])[1];
     // 12 Nov (1254): the row says when its budget is the confirmed plan worked out again; the rebuilt why dropped it,
     // so Actions and the drawer showed a cut with nothing to tell the two plans apart
-    const plans = (m(/The plan you confirmed on [^.]+\./) || [])[0];
+    const plans = (m(/The plan you confirmed on [^.]+\./) || [])[0], holds = (m(/This weekly figure holds until [^.]+\./) || [])[0];
     return P('Cut all your ads to ' + x[1] + ' a week for the rest of ' + x[2],
-      was ? 'Your ads ran at ' + was[1] + ' in the last 7 days' + (was[2] ? ' (' + was[2] + ')' : '') + (times ? ', about ' + times + ' times that' : '') + '.' + (plans ? ' ' + plans : '') : raw);
+      was ? 'Your ads ran at ' + was[1] + ' in the last 7 days' + (was[2] ? ' (' + was[2] + ')' : '') + (times ? ', about ' + times + ' times that' : '') + '.' + (holds ? ' ' + holds : '') + (plans ? ' ' + plans : '') : raw);
   }
   // site-funnel-weakstep led with its evidence and no instruction ("About 13% fewer of your visits end in an order")
   if (id === 'site-funnel-weakstep') {
@@ -24846,9 +24846,12 @@ function v3Quarter(iso) {
 const V3_GOAL_Q = (sb, b) => {
   const t = new Date().toISOString().slice(0, 10);
   return sb.from('mos_business_goal')
-    .select('period_start,period_end,revenue_target,contribution_margin_target,cam_target,spend_cap,new_customer_target,confirmed,phasing,confirmed_cam_target,confirmed_at,goal_beta:seasonality->beta')
+    .select('period_start,period_end,revenue_target,contribution_margin_target,cam_target,spend_cap,new_customer_target,confirmed,phasing,confirmed_cam_target,confirmed_at,goal_beta:seasonality->beta,rederived:seasonality->rederived->>at')
     .eq('brand_id', b).eq('status', 'active').lte('period_start', t).gte('period_end', t).order('created_at', { ascending: false }).limit(1);
 };
+// 1273: the stored plan is worked out again weekly or on an event, so its figures name the day; a plan worked out on
+// this read (fn_plan_quarter_compute) is on today's figures.
+const v3ReworkedOn = at => at ? 'on ' + v3Day(at) : 'on today’s figures';
 // The cost checks Goal & costs lists, read once and shared with Profit & sales.
 const V3_DRIFT_Q = (sb, b) => sb.from('vw_brand_config_drift')
   .select('input_key,unit,config_value,realised_value,verifiable,status,gbp_month').eq('brand_id', b);   // gbp_month: 1109
@@ -25063,7 +25066,7 @@ function V3GoalLead() {
     fig: 'Most the ' + reWord + ' lands ' + v3GbpRound(reachBest) + (best ? ', at ' + v3GbpRound(best) + ' of ads' : '') + (lySales ? '. Last year ' + fmtMoney(lySales) : '') });
   if (g && ph) checks.push({ k: 'ads', t: 'Plan ' + gpMonthName(peak.iso) + '’s ads',
     sub: mc > 0 && fop > 0 ? 'At that spend the last new customers cost ' + v3GbpRound(mc) + ' each. A first order makes ' + v3GbpRound(fop) + (ltv ? ', ' + v3GbpRound(ltv) + ' over a year' : '') + '.' : '',
-    fig: v3GbpRound(peak.gSpend) + (peak.x != null ? ', ' + fmtTimes(peak.x, 1) + ' your biggest month' : '') + (onConf ? ', worked out again on today’s figures' : '') });
+    fig: v3GbpRound(peak.gSpend) + (peak.x != null ? ', ' + fmtTimes(peak.x, 1) + ' your biggest month' : '') + (onConf ? ', worked out again ' + v3ReworkedOn(G && ph === G.months ? null : g && g.rederived) : '') });
   if (g) {
     const wait = L.entered ? L.weeks + ' weeks from order to arrival' : L.days + ' days from order to arrival, assumed until you add yours';
     if (PDG && SQG.peak) {
@@ -25319,7 +25322,7 @@ function V3GoalCash() {
   const figQ = useV3Figures();   // peak_cash_need and slow_stock from their owners (1080)
   const goalQ = useV3Rows('goal-active', V3_GOAL_Q);
   const [basis, setBasis] = React.useState(false);
-  const onGoal = !!(goalQ.rows && goalQ.rows[0] && Number(goalQ.rows[0].revenue_target) > 0), planWords = onGoal ? (goalQ.rows[0].confirmed === true ? 'on your plan, worked out again on today’s figures' : 'on the plan for your sales goal') : 'on the plan';
+  const onGoal = !!(goalQ.rows && goalQ.rows[0] && Number(goalQ.rows[0].revenue_target) > 0), planWords = onGoal ? (goalQ.rows[0].confirmed === true ? 'on your plan, worked out again ' + v3ReworkedOn(goalQ.rows[0].rederived) : 'on the plan for your sales goal') : 'on the plan';
   const C = q.rows && q.rows[0] && q.rows[0].cash_to_peak;
   const has = !!(C && C.said);
   const n = v => (v == null || !isFinite(Number(v)) ? null : Number(v));
