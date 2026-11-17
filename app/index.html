@@ -39,6 +39,14 @@
     .bar-note { order: 9; flex-basis: 100%; }
     .bar-note:empty { display: none; }
   }
+  /* A connection that stopped working: the app stays open and the bar says what to do. */
+  .bar-conn { display: inline-flex; align-items: center; gap: var(--space-3);
+    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-md);
+    background: var(--color-warning-wash); font-size: var(--text-sm); color: var(--color-ink); }
+  .bar-conn[hidden] { display: none; }
+  .app-bar .bar-conn a, .app-bar .bar-conn button { font: inherit; font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--color-panel);
+    background: var(--color-ink); border: 0; border-radius: var(--radius-md); padding: var(--space-1) var(--space-3); text-decoration: none; cursor: pointer; }
+  @media (max-width: 760px) { .bar-conn { order: 10; flex-basis: 100%; justify-content: space-between; } }
   .workspace-chip {
     display: inline-flex; align-items: center; gap: var(--space-2);
     font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-ink);
@@ -154,6 +162,7 @@
       <span id="brand-chip">loading…</span>
     </div>
     <span class="bar-note" id="bar-note" role="note"></span>
+    <div class="bar-conn" id="bar-conn" role="status" hidden><span id="bar-conn-text"></span><a id="bar-conn-act" href="../auth/workspace.html">Reconnect</a></div>
     <div class="app-bar-spacer"></div>
     <button type="button" class="bar-ask" id="bar-ask"><span>Ask or search</span><kbd id="bar-ask-kbd">Ctrl K</kbd></button>
     <!-- The four top tabs were removed on 2026-09-25 (Phase 2, one navigation).
@@ -197,11 +206,11 @@
       <div class="state-banner info">
         <div class="state-banner-icon"></div>
         <div class="state-banner-body">
-          <div class="state-banner-title">Connect Shopify to populate your dashboard</div>
-          <div class="state-banner-sub">Pulls 90 days of orders, products, stock and discounts once your store is connected.</div>
+          <div class="state-banner-title" id="nc-title">Connect Shopify to populate your dashboard</div>
+          <div class="state-banner-sub" id="nc-sub">Pulls 90 days of orders, products, stock and discounts once your store is connected.</div>
         </div>
         <div class="state-banner-action">
-          <a href="../auth/workspace.html" class="btn-primary">Set up Shopify</a>
+          <a href="../auth/workspace.html" class="btn-primary" id="nc-act">Set up Shopify</a>
         </div>
       </div>
     </div>
@@ -235,12 +244,26 @@
 
   let currentBrand = null;
   let currentToken = null;
+  let currentUserId = null;
   let connByProvider = {};
+  let connReadFailed = false;
 
   // Tab switching removed with the tabs (2026-09-25): the dashboard is the app.
 
+  // 17 Nov: Ask's history is kept per workspace and person in this browser. Signing out clears it,
+  // so the next person on the same machine never sees it (the old single key showed Halden's answers under frkl).
+  function clearAskHistory() {
+    try {
+      const drop = [];
+      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && /^(greta|frkl)_ask_history/.test(k)) drop.push(k); }
+      drop.forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
+  }
+  sb.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT') clearAskHistory(); });
+
   // ── Account menu ───────────────────────────────────────────────────────
   document.getElementById('logout-btn').addEventListener('click', async () => {
+    clearAskHistory();
     await sb.auth.signOut();
     window.location.href = '../auth/login.html';
   });
@@ -265,8 +288,10 @@
     const { data } = await sb.auth.getSession();
     const session = data?.session;
     currentToken = session?.access_token || null;
+    currentUserId = session?.user?.id || null;
 
     if (!session) {
+      clearAskHistory();
       // No session goes straight to log in and comes back here afterwards. The page used to stop
       // on "Your session has expired" with a Log out button beside it — wrong for someone who has
       // never logged in, and a dead end for everyone else. The banner stays as the fallback if
@@ -314,23 +339,55 @@
     document.getElementById('acct-brand').textContent = currentBrand.name;
     document.getElementById('acct').hidden = false;
 
-    // Load connections
-    const { data: connections } = await sb
-      .from('connections')
+    // Load connections. 17 Nov: a failed read used to count as "not connected" and hid the whole app behind one
+    // "Connect Shopify" screen. It is tried twice; if it still fails the app opens and the bar says the check failed.
+    const readConns = () => sb.from('connections')
       .select('id, provider, status, account_label, last_sync_at')
       .eq('brand_id', currentBrand.id);
-    connByProvider = Object.fromEntries((connections || []).map(c => [c.provider, c]));
+    let cr = await readConns();
+    if (cr.error) { await new Promise(r => setTimeout(r, 1500)); cr = await readConns(); }
+    connReadFailed = !!cr.error;
+    connByProvider = Object.fromEntries((cr.data || []).map(c => [c.provider, c]));
 
     renderOverview();
     document.getElementById('loading').hidden = true;
   })();
+
+  // The bar's line for a connection that needs the owner: what stopped, to when the figures run, and one button.
+  function showConnNote(text, label, onClick) {
+    const box = document.getElementById('bar-conn');
+    document.getElementById('bar-conn-text').textContent = text;
+    const act = document.getElementById('bar-conn-act');
+    act.textContent = label;
+    if (onClick) act.onclick = (e) => { e.preventDefault(); onClick(); };
+    box.hidden = false;
+  }
+  const shortDay = (iso) => { try { return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); } catch (e) { return ''; } };
 
   function renderOverview() {
     const shop = connByProvider['shopify'];
     const stateNotConnected = document.getElementById('state-not-connected');
     const stateFirstSync = document.getElementById('state-first-sync');
 
+    if (connReadFailed) {
+      // The check failed, not the store: open the app and offer the check again.
+      showConnNote('Could not check your Shopify connection.', 'Try again', () => location.reload());
+      return openDashboard();
+    }
+
+    if (shop && shop.status !== 'active' && shop.last_sync_at) {
+      // A store that synced before and has stopped: the figures it sent are still worth seeing.
+      showConnNote('Shopify needs reconnecting. Figures run to ' + shortDay(shop.last_sync_at) + '.', 'Reconnect');
+      return openDashboard();
+    }
+
     if (!shop || shop.status !== 'active') {
+      if (shop) {
+        // It was connected and never finished a sync: say reconnect, not set up.
+        document.getElementById('nc-title').textContent = 'Reconnect Shopify';
+        document.getElementById('nc-sub').textContent = 'The connection to ' + (shop.account_label || 'your store') + ' stopped before the first sync finished.';
+        document.getElementById('nc-act').textContent = 'Reconnect';
+      }
       stateNotConnected.hidden = false;
       stateFirstSync.hidden = true;
       return;
@@ -346,8 +403,12 @@
     }
 
     // Sync has run at least once — show the populated state.
-    stateNotConnected.hidden = true;
-    stateFirstSync.hidden = true;
+    openDashboard();
+  }
+
+  function openDashboard() {
+    document.getElementById('state-not-connected').hidden = true;
+    document.getElementById('state-first-sync').hidden = true;
 
     // Every connected brand renders the full live dashboard inline, instead of the
     // placeholder panels (previously gated to an allow-list of one — 'frkl' — which left
@@ -356,7 +417,7 @@
     // so we pre-satisfy the dashboard's access gate via shared same-origin localStorage
     // (no passcode prompt). The embedded dashboard's loader reads live tenant data using
     // this same session.
-    const richUrl = '/greta-dashboard.html?v=1794917645733';
+    const richUrl = '/greta-dashboard.html?v=1794923675737';
     // The dashboard is the app: every connected brand renders it inline. The old
     // placeholder-panel path below this point was unreachable (the condition above
     // was always true) and was removed on 2026-09-25 with the panels it filled.
@@ -367,6 +428,7 @@
     window.OI_ASK = {
       endpoint: SUPABASE_URL + '/functions/v1/ask-data',
       brand_id: currentBrand.id,
+      user_id: currentUserId,
       getJwt: async () => { const { data } = await sb.auth.getSession(); return data?.session?.access_token || ''; },
     };
     // Per-tenant brand identity for the embedded dashboard. The iframe's data loader

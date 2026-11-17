@@ -1049,6 +1049,8 @@
 
   // Logout
   document.getElementById('logout-btn').addEventListener('click', async () => {
+    // Ask's history in this browser goes with the session (17 Nov).
+    try { const drop = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && /^(greta|frkl)_ask_history/.test(k)) drop.push(k); } drop.forEach(k => localStorage.removeItem(k)); } catch (e) {}
     await sb.auth.signOut();
     window.location.href = './login.html';
   });

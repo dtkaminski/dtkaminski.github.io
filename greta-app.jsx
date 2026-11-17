@@ -9772,7 +9772,16 @@ function AskPanel(){
     catch(e){ return null; }   // cross-origin parent — leave Ask inert
   })())) || null;
   const [question, setQuestion] = useState('');
-  const [history, setHistory] = useState(()=>{ try { return JSON.parse(localStorage.getItem('frkl_ask_history')||'[]'); } catch { return []; } });
+  // 17 Nov: one history per workspace and person. The single 'frkl_ask_history' key held every brand's answers,
+  // so Halden's showed under frkl and survived sign-out; the shell clears these keys when someone signs out.
+  const histKey = React.useMemo(() => {
+    const L = window.FRKL_LIVE || {};
+    const b = (ASK && ASK.brand_id) || L.brandId || 'demo';
+    const u = (ASK && ASK.user_id) || (L.session && L.session.user && L.session.user.id) || 'anon';
+    try { localStorage.removeItem('frkl_ask_history'); } catch (e) {}
+    return 'greta_ask_history:' + b + ':' + u;
+  }, []);
+  const [history, setHistory] = useState(()=>{ try { return JSON.parse(localStorage.getItem(histKey)||'[]'); } catch { return []; } });
   const [loading, setLoading] = useState(false);
   // An answer takes up to a minute; the button saying "Thinking…" was all an owner saw (7 Oct). Say
   // what Greta is doing and for how long.
@@ -9792,8 +9801,8 @@ function AskPanel(){
   });
   const model = ASK_MODEL[depth] || ASK_MODEL.thorough;
   const [savedTasks, setSavedTasks] = useState({});   // message time → saved-to-board
-  const clearHistory = () => { localStorage.removeItem('frkl_ask_history'); setHistory([]); };
-  React.useEffect(()=>{ localStorage.setItem('frkl_ask_history', JSON.stringify(history.slice(-30))); }, [history]);
+  const clearHistory = () => { try { localStorage.removeItem(histKey); } catch (e) {} setHistory([]); };
+  React.useEffect(()=>{ try { localStorage.setItem(histKey, JSON.stringify(history.slice(-30))); } catch (e) {} }, [history, histKey]);
   React.useEffect(()=>{ localStorage.setItem('frkl_ask_depth', depth); }, [depth]);
   // 0264: questions and answers are kept in the workspace (ask_log). A browser with no history of
   // its own -- another device, cleared storage -- picks up this person's last ten.

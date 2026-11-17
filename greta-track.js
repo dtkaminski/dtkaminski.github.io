@@ -20,9 +20,14 @@
 
   // The closed set. vw_product_activation reads these names; adding one here without adding
   // it there gives you rows nobody looks at, which is how event schemas rot.
+  // 17 Nov: the app sent nine names this list did not hold, so every owner decision (move_decided), assignment,
+  // Greta run, feedback, tour and connection step was dropped here with a console warning. 1272 reads them.
   var EVENTS = {
     signup: 1, source_connected: 1, costs_entered: 1, goal_confirmed: 1,
-    action_started: 1, action_done: 1, action_skipped: 1, ask_used: 1, page_view: 1
+    action_started: 1, action_done: 1, action_skipped: 1, ask_used: 1, page_view: 1,
+    move_decided: 1, move_assigned: 1, greta_run: 1, feedback_sent: 1,
+    walkthrough_start: 1, walkthrough_end: 1,
+    reconnect_started: 1, shopify_connect_submitted: 1, shopify_connected: 1
   };
 
   // One id per tab, so "sessions" means visits rather than users. sessionStorage, because it
