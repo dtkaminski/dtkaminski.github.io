@@ -48,7 +48,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 
 /* Page head: one pattern on all sixteen pages. */
 .v3-page-head { border-bottom: 0; margin-bottom: var(--space-8); padding-bottom: 0; }
-.v3-page-title { font-size: var(--text-xl); font-weight: var(--weight-semi); letter-spacing: var(--tracking-tight); }
+.v3-page-title { font-size: var(--text-title); font-weight: var(--weight-semi); letter-spacing: var(--tracking-tight); }
 .v3-page-q { font-size: var(--text-base); margin-top: var(--space-1); }
 .v3-page-head-row { align-items: flex-end; justify-content: space-between; }
 
@@ -728,6 +728,10 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   padding: var(--space-4); font: inherit; font-size: var(--text-base); color: var(--color-ink); box-shadow: none; outline: none; }
 .v3-ask-bar { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--color-line); }
 .v3-ask-bar .v3-btn-p { margin-left: auto; }
+/* 17 Nov: at 375 the three controls squeezed to a letter a line ("Th/or/ou/gh"); they keep their words and wrap as a row */
+.v3-ask-bar { flex-wrap: wrap; row-gap: var(--space-2); }
+.v3-ask-bar > * { flex-shrink: 0; white-space: nowrap; }
+.v3-ask-bar .v3-seg button { white-space: nowrap; }
 .v3-prompts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .v3-prompt { border: 1px solid var(--color-line); background: var(--color-panel); color: var(--color-secondary); border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; line-height: var(--leading-snug); }
@@ -1760,6 +1764,12 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   .v3-walk-fab-btn:hover { background: var(--color-surface); }
   .v3-walk-fab-btn svg { display: none; }
 }
+/* 17 Nov: on a short desktop window (1024x768) the rail ran 64px past the screen and its last two rows, Team and Feedback,
+   sat under the tour row. Tighter group gaps and rows let every row clear it. */
+@media (min-width: 761px) and (max-height: 860px) {
+  .v3-nav .v3-nav-group { padding-top: var(--space-2); }
+  .v3-nav .v3-nav-item { min-height: calc(var(--tap-min) - var(--space-1)); padding-top: var(--space-1); padding-bottom: var(--space-1); }
+}
 /* Labels: sentence case, not shouted */
 .v3-kick, .section-eyebrow, .card-eyebrow, .v3-vitals-eyebrow, .v3-hero-lab { font-weight: var(--weight-normal); letter-spacing: 0; text-transform: none; color: var(--color-muted); }
 .v3-main .v3-al-live { letter-spacing: 0; }
@@ -1921,7 +1931,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-main-today { padding-top: var(--space-5); }
 .v3-page-head { margin-bottom: var(--space-4); }
 .v3-page-head-row { align-items: center; gap: var(--space-3); }
-.v3-main .v3-page-title { font-size: var(--text-xl); font-weight: var(--weight-semi); letter-spacing: var(--tracking-snug); margin: 0; }
+.v3-main .v3-page-title { font-size: var(--text-title); font-weight: var(--weight-semi); letter-spacing: var(--tracking-snug); margin: 0; }
 .v3-nav { background: var(--color-chrome); border-right: 1px solid var(--color-line); }
 .v3-nav-item { min-height: var(--tap-min); color: var(--color-muted); border-radius: var(--radius-md); }
 .v3-nav-item:hover { background: var(--color-surface); color: var(--color-ink); }
@@ -2244,7 +2254,9 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 @media (max-width: 767px) {
   .v3-profit-pl .bar { display: none; }
   .v3-profit-rows th { white-space: normal; }
-  .v3-profit-rows th:last-child, .v3-profit-rows td:last-child { display: none; }
+  /* 17 Nov: this used to hide every such table's last column on a phone, with no way to see it (Home, Review, Profit,
+     Website, Products, Goal). The table keeps every column and scrolls sideways inside its own box instead. */
+  table.v3-profit-rows { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 .v3-profit-pl td:first-child { white-space: nowrap; }
 @media (max-width: 767px) {
@@ -2394,6 +2406,14 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 .v3-main .v3-calendar { grid-template-columns: minmax(0, 1fr); }
 .v3-main .v3-calendar .cg-main.tg-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); min-width: 0; }
 .v3-calendar .mos-embed-scope { min-width: 0; }
+/* Calendar forecast rows: names at 12px and never cut, the row's total on its own line, day figures in the figure face. */
+.v3-main .v3-calendar .cg-proj-label { display: flex; flex-direction: column; justify-content: center; white-space: normal; overflow: visible; font-size: var(--text-xs); font-weight: var(--weight-semi); line-height: var(--leading-tight); }
+.v3-main .v3-calendar .cg-proj-sum { margin-left: 0; font-family: var(--font-figure); font-size: var(--text-xs); font-weight: var(--weight-normal); color: var(--color-muted); }
+.v3-main .v3-calendar .cg-proj-cell { font-family: var(--font-figure); font-size: var(--text-xs); letter-spacing: var(--tracking-tight); font-variant-numeric: tabular-nums; }
+/* Each event has a lane of its own and the lane's label names it: the label wraps instead of cutting the name, and the bar does not repeat it in a space too short to hold it. */
+.v3-main .v3-calendar .tg-llabel { display: flex; align-items: center; white-space: normal; overflow-wrap: anywhere; line-height: var(--leading-tight); }
+.v3-main .v3-calendar .tg-bar-t { display: none; }
+.v3-main .v3-calendar .cg-scen-head, .v3-main .v3-calendar .cg-scen-gap { font-size: var(--text-xs); }
 .v3-main .v3-calendar .mc-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-line); }
 .v3-main .v3-calendar .mc-month { font-size: var(--text-base); }
 .v3-main .v3-calendar .tg-scroll { border: 0; border-radius: var(--radius-none); }
@@ -2598,9 +2618,11 @@ table.v3-home-pl.v3-ad-mini.v3-why-tbl td small.v3-why-find { display: block; gr
 }
 .v3-ch-name { display: inline-flex; align-items: center; gap: var(--space-2); text-align: left; white-space: nowrap; color: var(--color-ink); }
 .v3-ch-table .v3-ch-strip { width: var(--size-strip-col); min-width: var(--size-strip-col); }
-.v3-strip { position: relative; display: block; height: var(--size-strip); }
-.v3-strip::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--color-line); }
-.v3-strip > i { position: absolute; }
+/* 17 Nov: the channel's spend strip is a span; the page's figure strip is a section with the same class, and these rules
+   squashed it to one line with a rule through it (Connections & data, tiles over Data coverage). */
+span.v3-strip { position: relative; display: block; height: var(--size-strip); }
+span.v3-strip::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--color-line); }
+span.v3-strip > i { position: absolute; }
 .v3-strip-tick { top: 0; bottom: 0; border-left: 1px dashed var(--color-strip-line); }
 .v3-strip-range { top: 25%; height: 50%; min-width: 1px; background: var(--color-strip-range); border-radius: var(--radius-sm); }
 .v3-strip-next { top: 10%; bottom: 10%; border-left: 2px solid var(--color-strip-next); }
@@ -2661,6 +2683,9 @@ table.v3-home-pl.v3-ad-mini.v3-why-tbl td small.v3-why-find { display: block; gr
 .v3-gy-set { padding-top: var(--space-3); padding-bottom: var(--space-3); }
 .v3-gy-set .v3-field > span { font-size: var(--text-xs); }
 .v3-gy-levers td { vertical-align: middle; }
+/* 17 Nov: ten one-line headers made the table 1,402px in a 1,170px panel, so the last column read "Adds to p…" behind a
+   sideways scrollbar. Headers wrap to two lines and the table fits. */
+.v3-main table.v3-gy-levers th { white-space: normal; vertical-align: bottom; }
 .v3-gy-lname { white-space: nowrap; }
 .v3-gy-lname small { display: block; font-size: var(--text-xs); color: var(--color-muted); }
 .v3-gy-by { font-size: var(--text-xs); color: var(--color-muted); min-width: var(--width-gy-by); }

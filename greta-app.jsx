@@ -3708,6 +3708,7 @@ function v3TileDelta(v, was, fmt) {
 }
 // A strip tile against an earlier figure: up says which way is good, null when neither is.
 function v3TileAgainst(k, v, was, up, ser, fmt) {
+  if (V3_AD_TILES[k] && v3NoAdAccount()) return <V3HomeTile key={k} k={k} v={FMT_NONE} delta="No ad account connected"/>;
   const t = v3TileDelta(v, was, fmt), dir = t.dir || 'flat';
   return <V3HomeTile key={k} k={k} v={v == null ? FMT_NONE : (fmt || fmtMoney)(v)} dir={dir} cls={up == null || dir === 'flat' ? '' : (dir === 'up') === up ? 'v3-up' : 'v3-down'}
     delta={t.delta} title={t.title} pts={ser}/>;
@@ -3773,7 +3774,7 @@ function V3ProfitLead({ view, costsVerified }) {
 
   // Profit after ads is the registered figure; product contribution less ads is not it (it leaves out the other
   // marketing cost), so there is no fallback to it.
-  if (cam == null) return (figQ.rows || figQ.err) ? <div className="v3-empty">Greta could not load your profit after ads just now. Refreshing usually sorts it.</div> : <V3SkeletonRows n={4}/>;
+  if (cam == null) return (figQ.rows || figQ.err) ? <V3LoadFailed what="Your profit after ads"/> : <V3SkeletonRows n={4}/>;
   const kept = cam;
   const costsF = v3Fig('costs_before_ads_30d', figQ.rows).value;   // 1109: sales less profit before ads, registered
   // after_overheads_30d, as Today and Review read it
@@ -3992,8 +3993,8 @@ function V3ProfitLead({ view, costsVerified }) {
           <tbody>{pl.map(r => (<tr key={r.k} className={r.kind === 'sub' || r.kind === 'total' ? 'tot' : ''}>
             <td>{r.k}</td>
             <td className="bar"><i className={'v3-home-pl-' + plClass(r)} style={{ width: Math.max(0.6, Math.min(100, plSales > 0 ? Math.abs(r.v) / plSales * 100 : 0)) + '%' }}/></td>
-            <td className={'r' + (r.kind !== 'out' && r.v < 0 ? ' v3-down' : '')}>{r.fig && v3Waiting(r.fig) ? 'Waiting for data' : fmtMoney(r.v)}</td>
-            <td className="r v3-muted">{r.kind === 'in' || !(plSales > 0) ? '' : ((r.kind === 'sub' || r.kind === 'total') && r.v < 0 ? '−' : '') + Math.round(Math.abs(r.v) / plSales * 100) + 'p'}</td>
+            <td className={'r' + (r.kind !== 'out' && r.v < 0 ? ' v3-down' : '')}>{r.fig && v3Waiting(r.fig) ? 'Waiting for data' : r.ads && v3NoAdAccount() ? 'No ad account' : fmtMoney(r.v)}</td>
+            <td className="r v3-muted">{r.kind === 'in' || !(plSales > 0) || (r.ads && v3NoAdAccount()) ? '' : ((r.kind === 'sub' || r.kind === 'total') && r.v < 0 ? '−' : '') + Math.round(Math.abs(r.v) / plSales * 100) + 'p'}</td>
           </tr>))}</tbody></table>
       </section>}
       {mixTot > 0 && <section className="v3-panel v3-profit-mix" aria-label="Sales from new and returning customers">
@@ -11392,7 +11393,30 @@ function RestockActionQueue(){
 // Holds the shape of what is coming, so the layout does not jump when it lands and the wait reads
 // as loading rather than broken. Rows, not a spinner: a spinner says "something is happening", a
 // skeleton says "a ranked list is happening".
+// A skeleton waits for reads, not for ever (eval 17 Nov: 26 skeletons on Home 38s after a failed read, no word). Once no
+// read is in flight and one has failed it says the part did not load and offers Try again; past 32s it says a read still in flight is slow.
+function v3ReadState() {
+  let fail = 0, wait = 0;
+  for (const k in V3_Q) { const q = V3_Q[k]; if (!q) continue; if (q.p) wait++; else if (q.err) fail++; }
+  const L = typeof window !== 'undefined' && window.FRKL_LIVE;   // the workspace loader behind the older pages
+  if (L && L.status === 'error') fail++;
+  return { fail, wait };
+}
+// Try again asks every failed read once more; anything that does not go through the shared reads (the board's own
+// read, a snapshot) is asked again by reloading the page.
+function v3RetryFailed() {
+  const s = v3ReadState();
+  const boardDown = typeof V3_BOARD !== 'undefined' && V3_BOARD && V3_BOARD.err;
+  if (s.fail && !boardDown) { window.dispatchEvent(new Event('v3-retry-failed')); return; }
+  try { window.location.reload(); } catch (e) {}
+}
 function V3SkeletonRows({ n }) {
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => { const iv = setInterval(() => setTick(t => t + 1), 4000); return () => clearInterval(iv); }, []);
+  const s = v3ReadState();
+  if (tick >= 8 && s.wait > 0) return <p className="v3-panel-note v3-load-failed" role="status">This part of the page is taking longer than usual.</p>;
+  if ((tick >= 3 && s.fail > 0 && s.wait === 0) || tick >= 8)
+    return <V3LoadFailed what="This part of the page" onRetry={() => { setTick(0); v3RetryFailed(); }}/>;
   return (<div aria-hidden="true">
     {Array.from({ length: n || 4 }).map((_, i) => (
       <div className="v3-skel-row" key={i}>
@@ -11625,7 +11649,7 @@ function V3BoardDigest({ n = 5 }){
   const { rows, err } = useV3Board();
   useV3Rows('board-moves', V3_BOARD_MOVES_Q);   // 1110: the levers the cards fold by
   useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
-  if (err) return <div className="v3-empty">Greta could not load your moves just now. Refreshing usually sorts it.</div>;
+  if (err) return <V3LoadFailed what="Your moves"/>;
   if (rows === null) return <V3SkeletonRows n={3}/>;
   const live = v3FoldPlans(v3LiveRows(rows));
   if (!live.length) return <div className="v3-empty">Nothing needs doing right now. Greta raises something here as soon as it is worth your time.</div>;
@@ -11750,7 +11774,7 @@ function V3ActionBoard(){
   const [showSmall, setShowSmall] = React.useState(false);
   const [drawer, setDrawer] = React.useState(null);   // { id, mode }
 
-  if (err) return <section className="v3-panel v3-board"><p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p></section>;
+  if (err) return <section className="v3-panel v3-board"><V3LoadFailed what="Actions"/></section>;
   if (rows === null) return <section className="v3-panel v3-board" aria-busy="true"><div className="v3-panel-pad"><V3SkeletonRows n={5}/></div></section>;
   const laneAll = Array.isArray(unpriced) ? unpriced : [];
   if (!rows.length && !laneAll.length) return <section className="v3-panel v3-board"><p className="v3-panel-note">No open actions. The list updates as new data arrives.</p></section>;
@@ -11895,7 +11919,7 @@ function V3Findings(){
     return () => { alive = false; };
   }, []);
   const head = n => (<div className="v3-panel-head"><h2>Findings</h2>{n > 0 && <span className="v3-count">{fmtCount(n)}</span>}{n > 0 && <span className="v3-muted">No figure</span>}</div>);
-  if (err) return (<section className="v3-panel" aria-label="Findings">{head(0)}<p className="v3-panel-note">Findings could not load. Refresh the page to try again.</p></section>);
+  if (err) return (<section className="v3-panel" aria-label="Findings">{head(0)}<V3LoadFailed what="Findings"/></section>);
   if (!rows || (!board.rows && !board.err)) return null;
   const onBoard = new Set((Array.isArray(board.unpriced) ? board.unpriced : []).map(r => r.external_id));
   const live = board.rows ? v3LiveRows(board.rows) : [];
@@ -12005,7 +12029,7 @@ function V3ChannelScoreboard(){
     return () => { dead = true; };
   }, []);
 
-  if (err) return <div className="v3-empty">Greta could not load your channel scoreboard just now, refreshing usually sorts it.</div>;
+  if (err) return <V3LoadFailed what="Your channel scoreboard"/>;
   if (rows === null) return <V3SkeletonRows n={4}/>;
   if (!rows.length) return (
     <div className="v3-score v3-enter">
@@ -15739,7 +15763,7 @@ function V3ProductCosts(){
   const costHead = n => (<div className="v3-panel-head"><h2>Product costs</h2>{n != null && <span className="v3-count">{n}</span>}<span className="v3-muted">From “Cost per item” in Shopify, refreshed every half hour</span></div>);
   if (!authed) return <section className="v3-panel"><V3Anchor id="costs"/>{costHead()}<p className="v3-panel-note">{v3NoBrand('your product costs')}</p></section>;
   if (d === undefined) return <section className="v3-panel" aria-busy="true"><V3Anchor id="costs"/>{costHead()}<div className="v3-panel-pad"><V3SkeletonRows n={4}/></div></section>;
-  if (d === false) return <section className="v3-panel"><V3Anchor id="costs"/>{costHead()}<p className="v3-panel-note">Your product costs could not load just now. Refreshing the page usually sorts it.</p></section>;
+  if (d === false) return <section className="v3-panel"><V3Anchor id="costs"/>{costHead()}<V3LoadFailed what="Your product costs"/></section>;
 
   // Rows arrive newest first; keep the first per key. (Before 0221 the server sent every day's row
   // per SKU, and keeping the last meant showing the oldest cost.)
@@ -17861,7 +17885,7 @@ function ProductTrafficMisallocation(){
   // undefined is still loading; a clean result is a real finding and gets said out loud,
   // because "we checked and found nothing" and "we never looked" must not look the same.
   if (d === undefined) return <V3SkeletonRows n={2}/>;
-  if (d === false) return <div className="v3-empty">Landing pages could not load just now. Refreshing the page usually sorts it.</div>;
+  if (d === false) return <V3LoadFailed what="Landing pages"/>;
   if (!d || !Number(d.worse_views)) return (
     <div className="card">
       <div className="card-section-title"><h2 style={{margin:0}}>Where your visitors land</h2></div>
@@ -18020,7 +18044,7 @@ function CashCeiling(){
   // and "If only profit mattered", beside an answer to spend less.
   const head = pill => (<div className="v3-panel-head"><h2>Cash</h2><span className="v3-muted">Next 13 weeks</span>{pill}</div>);
   if (gate === undefined) return <section className="v3-panel" aria-label="Cash" aria-busy="true">{head(null)}<div className="v3-panel-pad"><V3SkeletonRows n={3}/></div></section>;
-  if (gate === false) return <section className="v3-panel" aria-label="Cash">{head(null)}<p className="v3-panel-note">Cash could not load. Refresh the page to try again.</p></section>;
+  if (gate === false) return <section className="v3-panel" aria-label="Cash">{head(null)}<V3LoadFailed what="Cash"/></section>;
   const missing = !gate || gate.readiness !== 'ready';
   const toCash = label => <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>{label}</button>;
   if (missing) {
@@ -18798,7 +18822,7 @@ function V3MoveDecide({ row, small, onDecided, startMode, named, covers, rank })
       setTimeout(() => { v3BoardDrop(ext); v3QRefresh(V3_MOVE_KEYS); if (onDecided) onDecided('done'); }, 1600);
     }}/>}
     {mode && mode !== 'greta' && <div className="v3-mv-form">
-      <V3WhyChips list={V3_WHY[mode]} pick={pick} setPick={setPick} label={mode === 'wrong' ? 'What looks wrong?' : 'Why?'}/>
+      <V3WhyChips list={V3_WHY[mode]} pick={pick} setPick={setPick} label={mode === 'wrong' ? 'What looks wrong' : 'Reason'}/>
       {mode === 'later' && <label className="v3-mv-field"><span>Bring it back on</span>
         <input type="date" value={until} min={v3IsoAdd(today, 1)} max={v3IsoAdd(today, 183)} onChange={e => setUntil(e.target.value)}/></label>}
       <label className="v3-mv-field v3-mv-field-wide"><span>{mode === 'wrong' ? 'What looks wrong? (optional)' : 'Why? (optional)'}</span>
@@ -19231,7 +19255,7 @@ function V3TodayMoves({ q, board, gc }) {
   const fig = useV3Figures();
   useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
   const [opened, setOpened] = React.useState({});   // the first row is open until it is closed
-  if (board.err) return <div className="v3-empty">Greta could not load your moves just now. Refreshing usually sorts it.</div>;
+  if (board.err) return <V3LoadFailed what="Your moves"/>;
   if (!board.rows) return <V3SkeletonRows n={3}/>;
   const go = d => window.__oiGo && window.__oiGo(d);
   const moves = v3TodayMoveList(g, board.rows, bm.rows && bm.rows[0]);
@@ -19398,7 +19422,7 @@ function V3GoalChart({ P, g }) {
   // 12 Nov: the tiles above say "Plan lands" for a confirmed plan; the chart said "Forecast" for the same figure
   const fcWord = g.forecast_kind === 'confirmed_plan' ? 'Plan lands' : 'Forecast';
   const labs = [{ k: fcWord, v: g.forecast, y: yF, c: 'v3-al-lab v3-al-lab-fc', round: true }, { k: 'Goal', v: g.target, y: yG, c: 'v3-al-lab' }]
-    .concat(showPace ? [{ k: w < 520 ? 'At pace' : 'At today’s pace', v: pace, y: Y(pace), c: 'v3-al-lab v3-al-lab-pace' }] : []).sort((p, q) => p.y - q.y);
+    .concat(showPace ? [{ k: w < 520 ? 'At pace' : 'At today’s pace', v: pace, y: Y(pace), c: 'v3-al-lab v3-al-lab-pace', round: true }] : []).sort((p, q) => p.y - q.y);
   labs.forEach((l, i) => { l.at = Math.max(l.y, i ? labs[i - 1].at + 30 : top); });
   const over = labs[labs.length - 1].at - (H - bottom - 14);
   if (over > 0) labs.forEach(l => { l.at -= over; });
@@ -19959,7 +19983,7 @@ function V3LightLine({ e }) {
   const [open, setOpen] = React.useState(false);
   return (<span className="v3-light-line">
     <span>{e.line || V3_LIGHT_WORD[e.light] || ''}</span>
-    <button type="button" className="v3-linkbtn" onClick={() => setOpen(true)}>Why?</button>
+    <button type="button" className="v3-linkbtn" onClick={() => setOpen(true)}>Reason</button>
     {open && <V3WhyPanel e={e} onClose={() => setOpen(false)}/>}
   </span>);
 }
@@ -20463,7 +20487,7 @@ function V3HomeActions({ q, board }) {
     {n > 0 && <span className="v3-muted">Ranked by what each is worth and how sure the figure is</span>}
     <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button>
   </div>);
-  if (board.err) return <section className="v3-panel" id="v3-queue">{head(0)}<p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p></section>;
+  if (board.err) return <section className="v3-panel" id="v3-queue">{head(0)}<V3LoadFailed what="Actions"/></section>;
   if (!board.rows) return <section className="v3-panel" id="v3-queue" aria-busy="true">{head(0)}<div className="v3-panel-pad"><V3SkeletonRows n={3}/></div></section>;
   const moves = v3TodayMoveList(g, board.rows, bm.rows && bm.rows[0]).slice(0, 4);
   // 11 Nov: a shop with no priced move still has things to do (costs to enter, a pre-order to place). Home said
@@ -20580,7 +20604,7 @@ function V3HomeProfit({ L }) {
     <table className="v3-home-pl"><tbody>{rows.map(r => (<tr key={r.k} className={r.tot ? 'tot' : ''}>
       <td>{r.k}</td>
       <td className="bar"><i className={'v3-home-pl-' + r.c} style={{ width: Math.max(0.6, Math.min(100, Math.abs(r.v) / sales * 100)) + '%' }}/></td>
-      <td className={'r' + (r.tot && r.v < 0 ? ' v3-down' : '')}>{r.v < 0 ? '−' : ''}{fmtMoney(Math.abs(r.v))}</td>
+      <td className={'r' + (r.tot && r.v < 0 ? ' v3-down' : '')}>{r.c === 'ads' && v3NoAdAccount() ? 'No ad account' : (r.v < 0 ? '−' : '') + fmtMoney(Math.abs(r.v))}</td>
     </tr>))}</tbody></table>
   </section>);
 }
@@ -20652,6 +20676,10 @@ function v3Source(id) {
 }
 // A figure whose source has not sent anything yet shows these words instead of a number.
 const v3Waiting = id => { const s = v3Source(id); return !!(s && s.state === 'pending_sync'); };
+// 17 Nov (eval G10): a shop with no ad account connected has no ad figures. Ad spend, the cost of a new customer and
+// sales per £1 of ads say so instead of £0 (Tranquillity: "Cost of a new customer £0", "Ad spend £0, 0p").
+const v3NoAdAccount = () => { const s = v3Source('ads_30d'); return !!(s && s.state === 'needs_input'); };
+const V3_AD_TILES = { 'Ad spend': 1, 'Cost of a new customer': 1, 'Sales per £1 of ads': 1 };
 // The small tag beside a figure. Estimated and not-entered ones say, on hover or tap, what would make them measured.
 function V3SourceTag({ id }) {
   useV3Setup();
@@ -21034,6 +21062,12 @@ function useV3Rows(key, build) {
     return () => { dead = true; if (iv) clearInterval(iv); };
   }, [key, tries]);
   const q = V3_Q[key] || {};
+  // Try again on any failed part re-asks this read too when it failed (v3RetryFailed).
+  React.useEffect(() => {
+    const on = () => { const c = V3_Q[key]; if (c && c.err && !c.p) { delete V3_Q[key]; setTries(t => t + 1); } };
+    window.addEventListener('v3-retry-failed', on);
+    return () => window.removeEventListener('v3-retry-failed', on);
+  }, [key]);
   return { rows: q.rows || null, err: q.err || null, retry: () => { delete V3_Q[key]; setTries(t => t + 1); } };
 }
 // The figure registry (1080): every owner-facing figure with one owner, read once per page load
@@ -21992,8 +22026,8 @@ function V3Stock() {
       </>) : <p className="v3-note v3-measure">Every product that sells has enough stock to last until a new order could arrive{pk ? ', and through ' + pkName + ' at last year’s sales' : ''}.</p>}
       </div>{order.length > 0 && <V3MoveRunway lead peakOn={pk ? pk.start : null}/>}</div>
       {order.length > 0 ? (<>
-        {lost > 0 && <div className="v3-sowhat"><span>Waiting costs <b>{fmtMoney(lost)}</b> of profit, whatever you order now. Only faster delivery saves it: each week your supplier can cut is worth <b>{fmtMoney(sooner)}</b>{pkLate ? ', more in the peak' : ''}.</span>
-          {protect != null && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>The order protects {fmtMoney(protect)} a month <span className="v3-xref-go">on Actions</span></button>}</div>}
+        {lost > 0 && <div className="v3-sowhat"><span>Waiting costs <b>{v3GbpRound(lost)}</b> of profit, whatever you order now. Only faster delivery saves it: each week your supplier can cut is worth <b>{v3GbpRound(sooner)}</b>{pkLate ? ', more in the peak' : ''}.</span>
+          {protect != null && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>The order protects {v3GbpRound(protect)} a month <span className="v3-xref-go">on Actions</span></button>}</div>}
         {pkLate && <p className="v3-note v3-measure">{pkName} runs {v3Day(pk.start)} – {v3Day(pk.end, true)}. An order arriving on {v3Day(land)} is in time for its last {fmtCount(daysCaught)} {daysCaught === 1 ? 'day' : 'days'}. Those days sold {fmtMoney(catchNow)} last year, {fmtPctN(catchNow / pk.lySales)} of the peak’s sales. {v3IsoAdd(land, -7) <= pk.start ? 'A week sooner would catch all of it (' + fmtMoney(pk.lySales) + ').' : 'A week sooner would catch ' + fmtMoney(catchWeek) + ' (' + fmtPctN(catchWeek / pk.lySales) + ').'} So ask your supplier to send the peak’s products first.</p>}
         {pkAfter && anyPeak && <p className="v3-note v3-measure">{pkName} starts on {v3Day(pk.start)}, after the order arrives, so the quantities include what last year’s peak sold. {PD ? <> Peak stock needs to be in by {v3Day(PD.deadline)}, a week before it starts, so the order needs to go in by {v3Day(PD.orderBy)}.</> : null}</p>}
         {pk && land > pk.end && <p className="v3-note v3-measure">An order placed today arrives after {pkName} ends. {afterPk ? 'Unless a supplier can deliver the peak’s units sooner, what' : 'What'} you have in stock now is all you can sell in it; what to feature is below.</p>}
@@ -22372,8 +22406,8 @@ function V3Website({ start, period, customActive }) {
 
     {!allFailed && !allWait && (<section className="v3-panel" aria-label="Visits and orders">
       <div className="v3-panel-head"><h2>Visits and orders</h2>{now && <span className="v3-muted">{now.len === 1 ? 'By day' : now.len + ' days at a time'}</span>}</div>
-      {cl.err ? <p className="v3-panel-note">Microsoft Clarity could not load. Refresh the page to try again.</p>
-        : ord.err ? <p className="v3-panel-note">Orders could not load. Refresh the page to try again.</p>
+      {cl.err ? <V3LoadFailed what="Microsoft Clarity"/>
+        : ord.err ? <V3LoadFailed what="Orders"/>
         : !now ? <p className="v3-panel-note">Connect Microsoft Clarity on Connections &amp; data to see visits and friction.</p>
         : <>{now.ws.length >= 2 && <div className="v3-panel-pad v3-mk-charts">
           <figure className="v3-chart" aria-label="Visits"><figcaption><span className="v3-chart-title">Visits</span></figcaption>
@@ -22400,7 +22434,7 @@ function V3Website({ start, period, customActive }) {
     <section className="v3-panel" aria-label="Actions">
       <div className="v3-panel-head"><h2>Actions</h2>{live.length > 0 && <span className="v3-count">{live.length}</span>}<span className="v3-muted">Site and search</span>
         <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
-      {bd.err ? <p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p>
+      {bd.err ? <V3LoadFailed what="Actions"/>
         : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !shown.length ? <p className="v3-panel-note">No open actions on the site or search.</p>
         : <table className="v3-home-table">
@@ -22423,7 +22457,7 @@ function V3Website({ start, period, customActive }) {
 
     {!allFailed && !allWait && (<section className="v3-panel" aria-label="Site steps">
       <div className="v3-panel-head"><h2>Site steps</h2>{mo && <span className="v3-muted">Last month with reliable tracking: {monthName}{ageM != null && ageM >= 2 ? ', ' + ageM + ' months ago' : ''}</span>}</div>
-      {loop.err ? <p className="v3-panel-note">Site steps could not load. Refresh the page to try again.</p>
+      {loop.err ? <V3LoadFailed what="Site steps"/>
         : stages.length < 3 ? <p className="v3-panel-note">Steps show once a full month of site tracking is on file.</p>
         : <>
           <div className="v3-panel-pad">
@@ -22583,7 +22617,7 @@ function V3WebConversion() {
   const setG = g => { setGrain(g); setSel(null); setAllRows(false); };
 
   if (!D) return (<section className="v3-panel" aria-label="Conversion">
-    {late || (window.FRKL_LIVE && window.FRKL_LIVE.liveSnapshots) ? <p className="v3-panel-note">Conversion figures could not load. Refresh the page to try again.</p> : <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>}
+    {late || (window.FRKL_LIVE && window.FRKL_LIVE.liveSnapshots) ? <V3LoadFailed what="Conversion figures"/> : <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>}
   </section>);
   if (!ok || !R_) return (<section className="v3-panel" aria-label="Conversion">
     <p className="v3-panel-note">{M && M.days ? 'This needs 21 days of reliable Google Analytics. There are ' + fmtCount(M.days) + ' so far' + (M.lo ? ', since ' + v3Day(M.lo, true) : '') + '.' : 'These figures come from Google Analytics. Connect it on Connections & data.'}</p>
@@ -22805,6 +22839,7 @@ function V3CustomerList({ name, rows, onClose }) {
 const V3_SEG_ORDER = ['Champion', 'Loyal', 'Promising (new)', 'At risk', 'Dormant (one-time)'];
 const v3Dp1Num = v => (fmtOk(v) ? Number(v).toFixed(1) : FMT_NONE);
 function V3Customers({ start, period, customActive }) {
+  useV3Setup();   // which sources are connected (v3NoAdAccount)
   const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
   const tierQ = useV3Rows('cust-tier', V3_TIER_Q);
   const ue = useV3Rows('cust-ue', V3_UE_Q);
@@ -22943,7 +22978,7 @@ function V3Customers({ start, period, customActive }) {
   if (at && at.n > 0 && !onBoard('cust-winback-atrisk')) checks.push({ k: 'win', t: 'Win back customers who bought well and have gone quiet',
     sub: (winBuilt ? 'A win-back email is built in Klaviyo but switched off. ' : !winLive && flows.length ? 'No win-back email is set up. ' : '') + (retAov ? 'Your typical repeat order is ' + fmtMoney(retAov) + '.' : ''),
     fig: fmtCount(at.n) + ' customers, ' + fmtCount(at.mail) + ' can be emailed', go: ['customers', 'Build the list', 'segments'] });
-  if (gap != null) checks.push({ k: 'second', t: 'Ask for the second order before day ' + fmtCount(gap), sub: 'Time the follow-up email to land before then, with the add-on that goes with what they bought.',
+  if (gap != null && gap >= 1) checks.push({ k: 'second', t: 'Ask for the second order before day ' + fmtCount(gap), sub: 'Time the follow-up email to land before then, with the add-on that goes with what they bought.',
     fig: !onBoard('crm-flows') && post && medPer != null && post.per < medPer * 0.2 ? 'After-purchase email ' + fmtMoney(post.per, 2) + ' a person against ' + fmtMoney(medPer, 2)
       : R0 && R0.repeat_rate != null ? fmtPctN(Number(R0.repeat_rate)) + ' have ordered more than once' : FMT_NONE, go: ['products', 'Open Products'] });
   if (habit && !onBoard('discount-dependency')) checks.push({ k: 'disc', t: 'Reward full-price customers with perks, not codes',
@@ -22990,7 +23025,7 @@ function V3Customers({ start, period, customActive }) {
             <div className="v3-home-group-h">{whenLabel}<span>{signsOn ? v3TrendHead([sNew, sCac, sNs, sRs]) : !onFig && havePrior ? 'against the period before' : ''}</span></div>
             <div className="v3-home-tiles">
               {signsOn && sNew ? signTile(sNew, 'New customers', nc == null ? FMT_NONE : fmtCount(nc), nc) : v3TileAgainst('New customers', nc, onFig || !havePrior ? null : was.no, true, pts('nc'), v => fmtCount(v))}
-              {signsOn && sCac ? signTile(sCac, 'Cost of a new customer') : v3TileAgainst('Cost of a new customer', cac, onFig ? null : pCac, false, pts('cac'))}
+              {signsOn && sCac && !v3NoAdAccount() ? signTile(sCac, 'Cost of a new customer') : v3TileAgainst('Cost of a new customer', cac, onFig ? null : pCac, false, pts('cac'))}
               {signsOn && sNs ? signTile(sNs, 'New customers’ sales', nw == null ? null : fmtMoney(nw), nw) : v3TileAgainst('New customers’ sales', nw, onFig || !havePrior ? null : was.nw, true, pts('nw'))}
               {signsOn && sRs ? signTile(sRs, 'Returning customers’ sales', rt == null ? null : fmtMoney(rt), rt) : v3TileAgainst('Returning customers’ sales', rt, onFig || !havePrior ? null : was.rt, true, pts('rt'))}
             </div></div>
@@ -23008,7 +23043,7 @@ function V3Customers({ start, period, customActive }) {
 
     {!allFailed && !allWait && !empty && (<section className="v3-panel" aria-label="New and returning customers">
       <div className="v3-panel-head"><h2>New and returning customers</h2><span className="v3-muted">{len === 1 ? 'By day' : len + ' days at a time'}</span></div>
-      {nvr.err ? <p className="v3-panel-note">Customer sales could not load. Refresh the page to try again.</p>
+      {nvr.err ? <V3LoadFailed what="Customer sales"/>
         : !wins || wins.length < 2 ? <p className="v3-panel-note">Charts show once two periods of orders are on file.</p>
         : <><div className="v3-panel-pad v3-mk-charts">
           <figure className="v3-chart" aria-label="Sales"><figcaption><span className="v3-chart-title">Sales</span>
@@ -23036,7 +23071,7 @@ function V3Customers({ start, period, customActive }) {
     <section className="v3-panel" aria-label="Actions">
       <div className="v3-panel-head"><h2>Actions</h2>{live.length > 0 && <span className="v3-count">{live.length}</span>}<span className="v3-muted">Repeat orders and customer value</span>
         <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
-      {bd.err ? <p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p>
+      {bd.err ? <V3LoadFailed what="Actions"/>
         : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !shown.length ? <p className="v3-panel-note">No open actions on repeat orders or customer value.</p>
         : <table className="v3-home-table">
@@ -23057,7 +23092,7 @@ function V3Customers({ start, period, customActive }) {
         </tr>))}</tbody></table></div>
     </section>)}
 
-    {seg.err ? <section className="v3-panel" aria-label="Customer groups"><div className="v3-panel-head"><h2>Customer groups</h2></div><p className="v3-panel-note">Customer groups could not load. Refresh the page to try again.</p></section>
+    {seg.err ? <section className="v3-panel" aria-label="Customer groups"><div className="v3-panel-head"><h2>Customer groups</h2></div><V3LoadFailed what="Customer groups"/></section>
       : groups.length > 0 && (<section className="v3-panel" aria-label="Customer groups">
       <div className="v3-panel-head"><h2>Customer groups</h2><span className="v3-muted">All customers to date</span></div>
       <V3Anchor id="segments"/>
@@ -23098,9 +23133,11 @@ function V3Customers({ start, period, customActive }) {
 // A read that failed says so and offers to try again. Before this, a statement timeout during a
 // Shopify sync made the Products table say "Greta has not seen enough product sales yet" — false —
 // and the sections below it vanish without a word.
+// 17 Nov: the one failure pattern. It names what did not load and offers Try again on every panel; it used to blame a
+// busy database for any error, and 43 panels said "Refresh the page" with no button.
 function V3LoadFailed({ what, onRetry }) {
-  return (<div className="v3-empty">{what} could not load just now because the database was busy.{' '}
-    {onRetry && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={onRetry}>Try again</button>}</div>);
+  return (<p className="v3-panel-note v3-load-failed" role="status">{what} could not load.{' '}
+    <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={onRetry || v3RetryFailed}>Try again</button></p>);
 }
 // 1156: the one answer on ad spend. Worked out once (fn_brand_ad_decision) and quoted; no page makes its own.
 function V3AdAnswer({ action, g, panel }) {
@@ -23152,7 +23189,7 @@ function V3AdAnswer({ action, g, panel }) {
       </div>
       {A.owner_question && <div className="v3-adf-q"><b>{A.owner_question}</b>{action}</div>}
       <p className="v3-adf-note">{Number(G.profit_after_ads) >= tgt && Number(T.profit_after_ads) >= tgt ? <>Your profit goal is {fmtMoney(tgt)}. Either way you beat it. </> : null}
-        <button type="button" className="v3-mv-toggle" aria-expanded={why} onClick={() => setWhy(o => !o)}>{why ? 'Hide why' : 'Why?'}</button></p>
+        <button type="button" className="v3-mv-toggle" aria-expanded={why} onClick={() => setWhy(o => !o)}>{why ? 'Hide the reason' : 'Reason'}</button></p>
       {why && <p className="v3-adf-why">{A.said}</p>}
     </figure>);
   }
@@ -23353,7 +23390,7 @@ function V3ProductDiscounts() {
 
     <section className="v3-panel v3-prod-depth" aria-label="Discount depth">
       <div className="v3-panel-head"><h2>Discount depth</h2>{bandSpan && <span className="v3-muted">{bandSpan}</span>}</div>
-      {mq.err ? <p className="v3-panel-note">Discount depth could not load. Refresh the page to try again.</p>
+      {mq.err ? <V3LoadFailed what="Discount depth"/>
         : !mq.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !bandAll ? <p className="v3-panel-note">No finished month of orders yet.</p>
         : <><div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
@@ -23366,7 +23403,7 @@ function V3ProductDiscounts() {
     <section className="v3-panel" aria-label="Codes">
       <div className="v3-panel-head"><h2>Codes</h2>{listed.length > 0 && <span className="v3-count">{listed.length}</span>}<span className="v3-muted">Website orders, last 6 months</span>
         <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('marketing', 'codes')}>New customers by code</button></div>
-      {!D ? (late ? <p className="v3-panel-note">Discount codes could not load. Refresh the page to try again.</p> : <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={4}/></div>)
+      {!D ? (late ? <V3LoadFailed what="Discount codes"/> : <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={4}/></div>)
         : !listed.length ? <p className="v3-panel-note">No discount code was used on more than one order in the last 6 months.</p>
         : <><div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
           <thead><tr><th>Code</th><th className="v3-mk-opt">Pattern</th><th className="r">Orders</th><th className="r v3-mk-opt">Sales</th><th className="r">Discount</th><th className="r">Average</th><th className="r v3-mk-opt">Last used</th></tr></thead>
@@ -23652,7 +23689,7 @@ function V3Products() {
     <section className="v3-panel" aria-label="Actions">
       <div className="v3-panel-head"><h2>Actions</h2>{live.length > 0 && <span className="v3-count">{live.length}</span>}<span className="v3-muted">Products, returns and discounts</span>
         <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
-      {bd.err ? <p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p>
+      {bd.err ? <V3LoadFailed what="Actions"/>
         : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !shown.length ? <p className="v3-panel-note">No open actions on products, returns or discounts.</p>
         : <table className="v3-home-table">
@@ -23689,10 +23726,10 @@ function V3Products() {
             <td className={'r ' + (ch == null ? 'v3-muted' : ch >= 0 ? 'v3-up' : 'v3-down')}>{ch != null ? (ch >= 0 ? '+' : '−') + fmtPctN(Math.abs(ch)) : FMT_NONE}</td><td className="r v3-mk-opt">{fmtCount(d.units)}</td></tr>}
         </tbody></table></div>
       {top.length > 12 && <div className="v3-panel-pad"><button type="button" className="v3-btn v3-btn-sm" onClick={() => setShowAll(o => !o)}>{showAll ? 'Show top 12' : 'Show all ' + fmtCount(top.length) + ' products'}</button></div>}
-      <p className="v3-panel-note">Gross profit is after the product’s own cost and payment fees, before delivery and packing, so profit on Profit &amp; sales is lower.{pc.err ? ' Gross profit could not load. Refresh the page to try again.' : ''}{stock.err ? ' Stock could not load, so out-of-stock flags are missing.' : ''}</p>
+      <p className="v3-panel-note">Gross profit is after the product’s own cost and payment fees, before delivery and packing, so profit on Profit &amp; sales is lower.{pc.err ? ' Gross profit could not load.' : ''}{stock.err ? ' Stock could not load, so out-of-stock flags are missing.' : ''}</p>
     </section>)}
 
-    {facts.err ? <section className="v3-panel" aria-label="Hero products"><div className="v3-panel-head"><h2>Hero products</h2></div><p className="v3-panel-note">Hero products could not load. Refresh the page to try again.</p></section>
+    {facts.err ? <section className="v3-panel" aria-label="Hero products"><div className="v3-panel-head"><h2>Hero products</h2></div><V3LoadFailed what="Hero products"/></section>
       : !facts.rows ? null
       : h && (<section className="v3-panel" aria-label="Hero products">
       <div className="v3-panel-head"><h2>Hero products</h2><span className="v3-count">{h.heroes.length}</span><span className="v3-muted">Last 12 months</span></div>
@@ -23708,7 +23745,7 @@ function V3Products() {
           {h.hasHero && <td className="v3-web-wrap">{moveText(x)}</td>}
         </tr>); })}</tbody></table></div>
       {h.hasHero && h.brandBack != null && <p className="v3-panel-note">Share is of sales. Profit alone and with more are per order, after product and order costs and before ads, on orders this product led. Back in 6 months counts customers whose first order it led, against {fmtPctN(h.brandBack)} for all new customers. A dash means too few to say.</p>}
-      {hero.err && <p className="v3-panel-note">Basket and repeat figures could not load. Refresh the page to try again.</p>}
+      {hero.err && <V3LoadFailed what="Basket and repeat figures"/>}
     </section>)}
 
     {h && (<section className="v3-panel" aria-label="Range">
@@ -23719,7 +23756,7 @@ function V3Products() {
       {h.allFirsts > 0 && best.firsts > 0 && best.firsts >= Math.max(...h.sell.map(x => x.firsts)) && <p className="v3-panel-note">{best.title} starts more new customers than any other product: {fmtPctN(best.firsts / h.allFirsts)} of first orders.</p>}
     </section>)}
 
-    {attn.err ? <section className="v3-panel" aria-label="Product views"><div className="v3-panel-head"><h2>Product views</h2></div><p className="v3-panel-note">Product views could not load. Refresh the page to try again.</p></section>
+    {attn.err ? <section className="v3-panel" aria-label="Product views"><div className="v3-panel-head"><h2>Product views</h2></div><V3LoadFailed what="Product views"/></section>
       : v && (<section className="v3-panel" aria-label="Product views">
       <div className="v3-panel-head"><h2>Product views</h2><span className="v3-muted">{v3Day(v.from)} to {v3Day(v.to)}</span></div>
       <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
@@ -23778,7 +23815,7 @@ function V3ReturningBaseline() {
   // the forecast reads rounded, as every forecast does.
   const head = <div className="v3-panel-head"><h2>Returning customers, next six months</h2><span className="v3-muted">Customers already won</span>
     <V3Conf state="likely" detail="Built from your own customers: how many you won each month, and what customers like them spent in each month after their first order. Beyond a customer’s first year it assumes they keep spending at their month 10 to 12 rate."/></div>;
-  if (base.err || decay.err || act.err) return <section className="v3-panel" aria-label="Returning customers, next six months">{head}<p className="v3-panel-note">The returning-customer forecast could not load. Refresh the page to try again.</p></section>;
+  if (base.err || decay.err || act.err) return <section className="v3-panel" aria-label="Returning customers, next six months">{head}<V3LoadFailed what="The returning-customer forecast"/></section>;
   if (!base.rows || !decay.rows || !act.rows) return <section className="v3-panel" aria-busy="true">{head}<div className="v3-panel-pad"><V3SkeletonRows n={3}/></div></section>;
   if (!d || d.next6 <= 0) return null;   // under a year of history: no curve to project from
   const first = d.ahead[0].exp, last = d.ahead[d.ahead.length - 1].exp;
@@ -23850,7 +23887,7 @@ function V3Incrementality() {
   const vd = useV3Rows('mk-incr-verdict', (sb, b) => sb.from('vw_channel_verdict')
     .select('channel_type,verdict').eq('brand_id', b).limit(20));
   const chHead = <div className="v3-panel-head"><h2>Channels</h2><span className="v3-muted">Last 30 days</span></div>;
-  if (inc.err) return <section className="v3-panel">{chHead}<p className="v3-panel-note">Channels could not load. Refresh the page to try again.</p></section>;
+  if (inc.err) return <section className="v3-panel">{chHead}<V3LoadFailed what="Channels"/></section>;
   if (!inc.rows || (!sc.rows && !sc.err)) return <section className="v3-panel" aria-busy="true">{chHead}<div className="v3-panel-pad"><V3SkeletonRows n={3}/></div></section>;
   const beOf = {}; (sc.rows || []).forEach(x => { if (x.break_even_iroas != null) beOf[x.channel_type] = Number(x.break_even_iroas); });
   const optOf = {}; (opt.rows || []).forEach(x => { optOf[x.channel_type] = x; });
@@ -23911,6 +23948,7 @@ function V3Incrementality() {
 // The channel split (vw_calendar_channel_actuals) runs a day later than the registered ad spend, so its columns
 // are in the chart's tooltip and the Channels table, not added up beside the registered total.
 function V3MarketingPage({ start, period, customActive }) {
+  useV3Setup();   // which sources are connected (v3NoAdAccount)
   const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   // The server caps a read at 1,000 rows whatever the limit says, which left the oldest months short: three
@@ -24055,7 +24093,7 @@ function V3MarketingPage({ start, period, customActive }) {
         </figure>
         <figure className="v3-chart" aria-label="New customers">
           <figcaption><span className="v3-chart-title">New customers</span></figcaption>
-          {newQ.err || (newQ.rows && !newQ.rows.length) ? <p className="v3-panel-note">{newQ.err ? 'New customers could not load. Refresh the page to try again.' : 'No new customers in this data yet.'}</p> : (
+          {newQ.err ? <V3LoadFailed what="New customers" onRetry={newQ.retry}/> : (newQ.rows && !newQ.rows.length) ? <p className="v3-panel-note">No new customers in this data yet.</p> : (
           <R.ResponsiveContainer width="100%" height={240}>
             <R.ComposedChart data={wins} syncId="v3-ads-buying" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <R.CartesianGrid/>
@@ -24073,7 +24111,7 @@ function V3MarketingPage({ start, period, customActive }) {
     <section className="v3-panel" aria-label="Actions">
       <div className="v3-panel-head"><h2>Actions</h2>{live.length > 0 && <span className="v3-count">{live.length}</span>}<span className="v3-muted">Ads, email and new customers</span>
         <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
-      {bd.err ? <p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p>
+      {bd.err ? <V3LoadFailed what="Actions"/>
         : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !shown.length ? <p className="v3-panel-note">No open actions on ads, email or new customers.</p>
         : <table className="v3-home-table">
@@ -24109,7 +24147,7 @@ function V3ChannelMap() {
   const q = useV3Rows('channel-map', V3_CHANNEL_MAP_Q);
   // 0383: Marketing ran to 8-10 screens on a phone; the biggest six channels show, the rest fold
   const st = React.useState(false), all = st[0], setAll = st[1];
-  if (q.err) return <section className="v3-panel"><div className="v3-panel-head"><h2>Sales by channel</h2></div><p className="v3-panel-note">Sales by channel could not load. Refresh the page to try again.</p></section>;
+  if (q.err) return <section className="v3-panel"><div className="v3-panel-head"><h2>Sales by channel</h2></div><V3LoadFailed what="Sales by channel"/></section>;
   if (!q.rows) return <section className="v3-panel" aria-busy="true"><div className="v3-panel-head"><h2>Sales by channel</h2></div><div className="v3-panel-pad"><V3SkeletonRows n={3}/></div></section>;
   const M = (q.rows[0] || {}).map;
   if (!M || !Array.isArray(M.channels) || !(Number(M.web_sales) > 0)) return null;
@@ -24166,8 +24204,11 @@ function useV3PageTabs(map, follows) {
     const h = document.querySelector('.v3-page-head');
     if (!h) return undefined;
     if (follows[tab]) h.removeAttribute('data-fixed-period'); else h.setAttribute('data-fixed-period', '1');
+    // 17 Nov: the header leaves the period control out on a tab that keeps its own window. Hidden with CSS it
+    // stayed in the page, and setting it changed nothing on six tabs (eval 3.3).
+    try { window.__v3FixedPeriod = !follows[tab]; window.dispatchEvent(new Event('v3-fixed-period')); } catch (e) {}
     try { const on = document.querySelector('.v3-goal-tabs .v3-tab.on'); if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
-    return () => h.removeAttribute('data-fixed-period');
+    return () => { h.removeAttribute('data-fixed-period'); try { window.__v3FixedPeriod = false; window.dispatchEvent(new Event('v3-fixed-period')); } catch (e) {} };
   }, [tab]);
   return [tab, pick, seen];
 }
@@ -24366,7 +24407,7 @@ function V3MarketingEmail() {
   const cmap = useV3Rows('channel-map', V3_CHANNEL_MAP_Q);   // 9 Nov: the shop's own count of email sales, as Sales by channel
   const [allCamps, setAllCamps] = React.useState(false);
   const head = <div className="v3-panel-head"><h2>Email</h2><span className="v3-muted">Klaviyo</span></div>;
-  if (fl.err || ca.err) return <section className="v3-panel">{head}<p className="v3-panel-note">Email could not load. Refresh the page to try again.</p></section>;
+  if (fl.err || ca.err) return <section className="v3-panel">{head}<V3LoadFailed what="Email"/></section>;
   if (!fl.rows || !ca.rows) return <section className="v3-panel" aria-busy="true">{head}<div className="v3-panel-pad"><V3SkeletonRows n={5}/></div></section>;
   if (!fl.rows.length && !ca.rows.length) return (<section className="v3-panel">{head}<div className="v3-panel-note v3-mk-test"><span>No Klaviyo emails have synced for this brand.</span>
     <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('settings')}>Connections</button></div></section>);
@@ -24514,7 +24555,7 @@ function V3MarketingEmail() {
 function V3MarketingCodes() {
   const q = useV3Rows('brand-codes', V3_CODES_Q);
   const head = <div className="v3-panel-head"><h2>Discount codes</h2><span className="v3-muted">Last year</span></div>;
-  if (q.err) return <section className="v3-panel">{head}<p className="v3-panel-note">Discount codes could not load. Refresh the page to try again.</p></section>;
+  if (q.err) return <section className="v3-panel">{head}<V3LoadFailed what="Discount codes"/></section>;
   if (!q.rows) return <section className="v3-panel" aria-busy="true">{head}<div className="v3-panel-pad"><V3SkeletonRows n={5}/></div></section>;
   const rows = q.rows.filter(r => Number(r.orders_365d) >= 10);
   if (!rows.length) return <section className="v3-panel">{head}<p className="v3-panel-note">No discount code has 10 or more orders in the last year.</p></section>;
@@ -24614,7 +24655,7 @@ function V3MarketingPlatforms({ start, period, customActive }) {
     </section>}
 
     {evRows.length === 0 && legs.err && room.err && ev.err && <section className="v3-panel" aria-label="Spend and return">
-      <div className="v3-panel-head"><h2>Spend and return</h2></div><p className="v3-panel-note">Spend and return could not load. Refresh the page to try again.</p></section>}
+      <div className="v3-panel-head"><h2>Spend and return</h2></div><V3LoadFailed what="Spend and return"/></section>}
     {evRows.length > 0 && <section className="v3-panel" aria-label="Spend and return">
       <div className="v3-panel-head"><h2>Spend and return</h2>{weeks > 0 && <span className="v3-muted">{fmtCount(weeks)} weeks</span>}</div>
       <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
@@ -25048,6 +25089,10 @@ function V3GoalLead() {
       <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={replan}>Re-plan the quarter</button>
     </div>)}
     <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      {/* 17 Nov: when the goal verdict fails to load the strip says so; the profit group used to vanish without a word */}
+      {!GV && tgG.err && <div className="v3-home-group" style={{ '--n': 1 }}>
+        <div className="v3-home-group-h">Profit after ads</div>
+        <V3LoadFailed what="The profit verdict" onRetry={tgG.retry}/></div>}
       {GV && <div className="v3-home-group" style={{ '--n': 2 }}>
         <div className="v3-home-group-h">Profit after ads<span>Goal {v3GbpRound(TGG.target)}</span><b className={'v3-pill ' + pillOf[GV.cls || '']}>{GV.word}</b></div>
         <div className="v3-home-tiles">
@@ -25149,7 +25194,7 @@ function V3GoalActions({ prefixes, words, sub }) {
   return (<section className="v3-panel" aria-label="Actions">
     <div className="v3-panel-head"><h2>Actions</h2>{live.length > 0 && <span className="v3-count">{live.length}</span>}<span className="v3-muted">{sub}</span>
       <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
-    {bd.err ? <p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p>
+    {bd.err ? <V3LoadFailed what="Actions"/>
       : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div>
       : !shown.length ? <p className="v3-panel-note">No open actions on {words}.</p>
       : <table className="v3-home-table">
@@ -25498,7 +25543,7 @@ function V3ClosedActions() {
   const [tab, setTab] = React.useState(null);
   const [all, setAll] = React.useState(false);
   const head = (n, only) => (<div className="v3-panel-head"><h2>Closed actions</h2>{n > 0 && <span className="v3-count">{fmtCount(n)}</span>}{only && <span className="v3-muted">{only}</span>}</div>);
-  if (q.err) return (<section className="v3-panel" aria-label="Closed actions">{head(0)}<p className="v3-panel-note">Closed actions could not load. Refresh the page to try again.</p></section>);
+  if (q.err) return (<section className="v3-panel" aria-label="Closed actions">{head(0)}<V3LoadFailed what="Closed actions"/></section>);
   if (!q.rows || !(bj.rows || bj.err) || !(res.rows || res.err)) return null;
   const joined = bj.rows && bj.rows[0] && bj.rows[0].created_at ? String(bj.rows[0].created_at) : null;
   // tasks imported from before the brand joined Greta are not its record (0958)
@@ -25873,7 +25918,7 @@ function V3Review() {
     <section className="v3-panel" aria-label="Actions">
       <div className="v3-panel-head"><h2>Actions</h2><span className="v3-muted">For the week’s meeting</span>
         <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
-      {board.err ? <p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p>
+      {board.err ? <V3LoadFailed what="Actions"/>
         : !board.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !top.length ? <p className="v3-panel-note">No open actions.</p>
         : <table className="v3-home-table">
@@ -25950,7 +25995,7 @@ function V3ReviewNotes({ weekStart, range }) {
   };
   return (<section className="v3-panel" aria-label="Notes">
     <div className="v3-panel-head"><h2>Notes</h2><span className="v3-muted">{range}</span></div>
-    {q.err ? <p className="v3-panel-note">Notes could not load. Refresh the page to try again.</p> : !q.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div> : q.rows.length > 0 && (
+    {q.err ? <V3LoadFailed what="Notes"/> : !q.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div> : q.rows.length > 0 && (
       <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
         <thead><tr><th>Date</th><th>Type</th><th>Note</th><th>By</th><th><span className="v3-sr-only">Remove</span></th></tr></thead>
         <tbody>{q.rows.map(r => <tr key={r.id}><td>{v3Day(r.created_at)}</td><td>{r.kind === 'decision' ? 'Decision' : 'Note'}</td><td className="v3-review-wrap">{r.body}</td><td>{r.author_id === uid ? 'You' : 'Team'}</td>
@@ -26145,7 +26190,7 @@ function V3Competitors() {
     {(hasWeeks || M || gsc.err || meta.err) && !allFailed && !waiting && (<section className="v3-panel" aria-label="Clicks on your name and Meta cost">
       <div className="v3-panel-head"><h2>Clicks on your name and Meta cost</h2></div>
       <div className={'v3-panel-pad v3-mk-charts' + ((hasWeeks || gsc.err) && (M || meta.err) ? '' : ' v3-comp-one')}>
-        {gsc.err ? <p className="v3-panel-note">Search Console could not load. Refresh the page to try again.</p> : hasWeeks && (<figure className="v3-chart" aria-label="Clicks on your name, by week">
+        {gsc.err ? <V3LoadFailed what="Search Console"/> : hasWeeks && (<figure className="v3-chart" aria-label="Clicks on your name, by week">
           <figcaption><span className="v3-chart-title">Clicks on your name, by week</span>
             {S.typical != null && <span className="v3-legend">Typical week {fmtCount(Math.round(S.typical))}</span>}</figcaption>
           <R.ResponsiveContainer width="100%" height={240}>
@@ -26156,7 +26201,7 @@ function V3Competitors() {
             </R.ComposedChart>
           </R.ResponsiveContainer>
         </figure>)}
-        {meta.err ? <p className="v3-panel-note">Meta could not load. Refresh the page to try again.</p> : M && (<figure className="v3-chart" aria-label="Meta cost per 1,000 views, by month">
+        {meta.err ? <V3LoadFailed what="Meta"/> : M && (<figure className="v3-chart" aria-label="Meta cost per 1,000 views, by month">
           <figcaption><span className="v3-chart-title">Meta cost per 1,000 views, by month</span></figcaption>
           <R.ResponsiveContainer width="100%" height={240}>
             <R.ComposedChart data={M.list} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -26172,7 +26217,7 @@ function V3Competitors() {
     <section className="v3-panel" aria-label="Actions">
       <div className="v3-panel-head"><h2>Actions</h2>{live.length > 0 && <span className="v3-count">{live.length}</span>}<span className="v3-muted">Google ads and search</span>
         <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
-      {bd.err ? <p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p>
+      {bd.err ? <V3LoadFailed what="Actions"/>
         : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !shown.length ? <p className="v3-panel-note">No open actions on Google ads or search.</p>
         : <table className="v3-home-table">
@@ -26184,7 +26229,7 @@ function V3Competitors() {
 
     {!allFailed && !waiting && (<section className="v3-panel" aria-label="Google auctions">
       <div className="v3-panel-head"><h2>Google auctions</h2>{G && <span className="v3-muted">30 days to {v3Day(G.b1, true)}</span>}</div>
-      {gads.err ? <p className="v3-panel-note">Google Ads could not load. Refresh the page to try again.</p>
+      {gads.err ? <V3LoadFailed what="Google Ads"/>
         : !G || !G.list.length ? <p className="v3-panel-note">Connect Google Ads on Connections &amp; data to see the auctions you win and lose.</p>
         : <><div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
           <thead><tr><th>Campaign</th><th className="v3-mk-opt v3-comp-wide">Type</th><th className="r">Shown in</th><th className="r">Lost on ad rank</th><th className="r v3-mk-opt">Lost on budget</th><th className="r v3-mk-opt v3-comp-wide">Clicks</th><th className="r v3-mk-opt">Spend</th><th className="r" title="Sales per £1 of ads, by Google’s own count">Sales per £1</th></tr></thead>
@@ -26204,7 +26249,7 @@ function V3Competitors() {
 
     {!allFailed && !waiting && (<section className="v3-panel" aria-label="Google search">
       <div className="v3-panel-head"><h2>Google search</h2><span className="v3-muted">{S ? 'Unpaid results, 30 days to ' + v3Day(S.q1, true) : 'Unpaid results'}</span></div>
-      {gsc.err ? <p className="v3-panel-note">Search Console could not load. Refresh the page to try again.</p>
+      {gsc.err ? <V3LoadFailed what="Search Console"/>
         : !S ? <p className="v3-panel-note">Connect Search Console on Connections &amp; data to see clicks and position.</p>
         : <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
           <thead><tr><th>Search</th><th className="r">Clicks</th><th className="r v3-mk-opt">30 days before</th><th className="r v3-mk-opt">Times shown</th><th className="r">Share who clicked</th><th className="r">Average position</th></tr></thead>
@@ -26248,7 +26293,7 @@ function V3CompetitorList({ q }) {
   const confState = c => (c === 'high' ? 'likely' : c === 'medium' ? 'probably' : 'possible');
   return (<section className="v3-panel" aria-label="Competitor list">
     <div className="v3-panel-head"><h2>Competitor list</h2>{rows.length > 0 && <span className="v3-count">{rows.length}</span>}<span className="v3-muted">Researched on request from the open web</span></div>
-    {q.err ? <p className="v3-panel-note">Your competitor list could not load. Refresh the page to try again.</p> : loading ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div> : rows.length === 0
+    {q.err ? <V3LoadFailed what="Your competitor list"/> : loading ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div> : rows.length === 0
       ? <p className="v3-panel-note">No competitors listed yet. Add the brands your customers compare you with.</p>
       : (<div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
         <thead><tr><th>Competitor</th><th className="v3-mk-opt">Website</th><th>Researched</th><th className="v3-mk-opt">Confidence</th><th className="r v3-mk-opt">Sources</th><th><span className="v3-sr-only">Actions</span></th></tr></thead>
@@ -26426,7 +26471,7 @@ function V3DataTrust() {
     : feeds + ' ' + (items.length === 1 ? 'One thing makes' : v3Sentence(['', 'one', 'two', 'three', 'four', 'five', 'six'][items.length] || String(items.length)) + ' things make') + ' numbers read wrong: ' + shortList.join('; ') + (items.length > 3 ? '; and ' + (items.length - 3) + ' more below' : '') + '.';
   return (<div className="v3-page-stack"><section>
     <div className="v3-kick">Data trust</div>
-    <p className="v3-verdict">{verdict}</p>
+    <p className="v3-note v3-measure">{verdict}</p>
     {items.length > 0 && <ol className="v3-moves">{items.map(i => (<li key={i.k}><b>{i.head}</b> {i.body}{i.extra || null}</li>))}</ol>}
   </section>
   <V3DriverStrip keys={['claims']} opts={orders30 > 0 && meta.rows && gads.rows && ttk.rows ? { claims: { m: mP, g: gP, t: tP, o: orders30 } } : null}/>
@@ -26532,7 +26577,7 @@ function V3Team() {
   return (<div className="v3-page-stack">
     <section>
       <div className="v3-kick">Who has access</div>
-      <p className="v3-verdict">{verdict}</p>
+      <p className="v3-note v3-measure">{verdict}</p>
       {err && <p className="v3-note v3-bad">{err}</p>}
       <table className="v3-rw">
         <thead><tr><th className="t-text">Person</th><th className="t-text">Role</th><th className="t-text">Last active</th><th className="t-text">In Greta, last 30 days</th><th/></tr></thead>
@@ -26921,7 +26966,8 @@ function V3BusinessState({ part }) {
   const figQ = useV3Figures();   // the registered figures the signals and signs show (1080)
   const yq = useV3Rows(part === 'figs' ? 'brand-yesterday' : 'brand-yesterday-none', part === 'figs' ? V3_YESTERDAY_Q : V3_NO_READ);
   const [drv, setDrv] = React.useState(null);   // which sign's drivers are open: 'cac', 'ret', 'ly', 'repeat'
-  if (q.err) return null;                                   // before 0269, or unreadable: Today carries on without it
+  // 17 Nov: a failed read says so once, in the figures part (it used to drop the panels without a word).
+  if (q.err) return part !== 'figs' ? null : <section className="v3-panel"><div className="v3-panel-pad"><V3LoadFailed what="The last 30 days" onRetry={q.retry}/></div></section>;
   // 1144: a brand with less than the month the read needs gets V3YoungHero instead; "a month after all costs" would set
   // a month's overheads against its first fortnight of sales
   const youngH = typeof window !== 'undefined' && window.GRETA_HEADLINE && window.GRETA_HEADLINE.setup;
@@ -27470,7 +27516,7 @@ function V3StockDrivers({ order, lead, land, sooner }) {
   if (!(tot > 0)) return null;
   return (<div className="v3-strip-act">
     <button type="button" className="v3-xref v3-sign-act" aria-expanded={open} onClick={() => setOpen(o => !o)}>
-      {open ? 'Hide what is driving it' : 'What is driving the ' + fmtMoney(tot) + ' lost?'} <span className="v3-xref-go">{open ? '↑' : '↓'}</span></button>
+      {open ? 'Hide the causes' : 'Causes of the ' + v3GbpRound(tot) + ' lost'} <span className="v3-xref-go">{open ? '↑' : '↓'}</span></button>
     {open && <V3DriverPanel fixed={v3ModelStock(order, lead, land, sooner)}/>}
   </div>);
 }
@@ -28760,7 +28806,7 @@ function V3IncrementalPanel() {
   const q = useV3Rows('incremental-read', V3_INCR_Q);
   const D = q.rows && q.rows[0];
   const head = (<div className="v3-panel-head"><h2>True return by channel</h2><span className="v3-muted">Last 30 days</span></div>);
-  if (q.err) return (<section className="v3-panel" id="v3-incremental" aria-label="True return by channel">{head}<p className="v3-panel-note">True return could not load. Refresh the page to try again.</p></section>);
+  if (q.err) return (<section className="v3-panel" id="v3-incremental" aria-label="True return by channel">{head}<V3LoadFailed what="True return"/></section>);
   if (!D || D.state !== 'ok') return null;
   return (<section className="v3-panel" id="v3-incremental" aria-label="True return by channel">{head}<div className="v3-panel-pad"><V3Incremental/></div></section>);
 }
@@ -28899,13 +28945,13 @@ const V3_AM_ACQ_Q = (sb, b) => sb.from('anatomy_metric_value').select('metric_ke
   .eq('brand_id', b).in('metric_key', ['weighted_ncac', 'spending_power', 'pct_over_model', 'new_customer_layers']).limit(4);
 function V3AcquisitionChecks() {
   const q = useV3Rows('acq-checks', V3_AM_ACQ_Q);
-  if (q.err) return <section className="v3-panel" aria-label="Cost checks"><div className="v3-panel-head"><h2>Cost checks</h2></div><p className="v3-panel-note">Cost checks could not load. Refresh the page to try again.</p></section>;
+  if (q.err) return <section className="v3-panel" aria-label="Cost checks"><div className="v3-panel-head"><h2>Cost checks</h2></div><V3LoadFailed what="Cost checks"/></section>;
   if (!q.rows || !q.rows.length) return null;
   const am = {}; q.rows.forEach(r => { if (r.value != null && r.display) am[r.metric_key] = r; });
   const W = am.weighted_ncac && am.weighted_ncac.detail, O = am.pct_over_model && am.pct_over_model.detail, M0 = O && Array.isArray(O.months) ? O.months[0] : null;
   const est = r => (r.state === 'estimated' ? 'An estimate. ' : '');
   const rows = [
-    am.weighted_ncac && { k: 'Cost of a new customer, gifts and creator codes included', v: fmtMoney(Number(am.weighted_ncac.value), 2),
+    am.weighted_ncac && !(v3NoAdAccount() && !(Number(am.weighted_ncac.value) > 0)) && { k: 'Cost of a new customer, gifts and creator codes included', v: fmtMoney(Number(am.weighted_ncac.value), 2),
       b: W && W.seeding != null && W.creator != null ? 'Gifts ' + fmtMoney(W.seeding) + ', creator codes ' + fmtMoney(W.creator) : am.weighted_ncac.display },
     am.spending_power && { k: 'Ad spend that adds £1 to that cost', v: v3GbpRound(Number(am.spending_power.value)) + ' a month', b: est(am.spending_power) + 'From your cost curve' },
     am.pct_over_model && { k: (M0 ? gpMonthName(M0.month) : 'Last month') + ' against your cost curve', v: (Number(am.pct_over_model.value) >= 0 ? '+' : '−') + fmtPctN(Math.abs(Number(am.pct_over_model.value))),
@@ -30708,8 +30754,8 @@ function V3TellUs({ dest, label }) {
       {sent ? 'Sent. Thank you.' : ''}
     </p>}
     {open && <div className="v3-tell-form">
-      <V3WhyChips list={V3_WHY.page} pick={pick} setPick={setPick} label="What is it?"/>
-      <label className="v3-mv-field"><span>What should we know about {label}?</span>
+      <V3WhyChips list={V3_WHY.page} pick={pick} setPick={setPick} label="Kind of feedback"/>
+      <label className="v3-mv-field"><span>Feedback on {label}</span>
         <textarea ref={area} rows={3} maxLength={2000} value={text} onChange={e => setText(e.target.value)}
                   placeholder="For example: the ad spend here does not match what Meta shows me"/></label>
       <div className="v3-mv-btns">
@@ -30761,6 +30807,8 @@ function V3App({ dest, go, children, start, periodCtl }) {
   const stq = useV3Rows('brand-state', V3_STATE_Q);
   if (stq.rows && stq.rows[0] && stq.rows[0].freshness && stq.rows[0].freshness.demo) window.__v3SampleBrand = true;
   const inShell = !!v3ShellEl('bar-ask');   // the shell's bar holds the box; on its own the dashboard keeps it in the nav
+  const [fixedPeriod, setFixedPeriod] = React.useState(() => !!window.__v3FixedPeriod);
+  React.useEffect(() => { const on = () => setFixedPeriod(!!window.__v3FixedPeriod); window.addEventListener('v3-fixed-period', on); return () => window.removeEventListener('v3-fixed-period', on); }, []);
   return (<div className={'v3-root' + (inShell ? ' v3-in-shell' : '')}>
     {/* First thing in the tab order on every page: the nav has 16 items and a keyboard
         user had to walk all of them to reach the content. */}
@@ -30801,7 +30849,7 @@ function V3App({ dest, go, children, start, periodCtl }) {
             <h1 className="v3-page-title">{d.label}</h1>
             {dest === 'today' && <V3HomeUpdated/>}
             {/* 2 Nov: Ask lives in Today's agent lead (V3AgentLead) */}
-            {V3_PERIOD_PAGES.indexOf(dest) >= 0 ? periodCtl : null}
+            {V3_PERIOD_PAGES.indexOf(dest) >= 0 && !fixedPeriod ? periodCtl : null}
             {dest === 'review' && <div id="v3-page-control"/>}
           </div>
         </header>
