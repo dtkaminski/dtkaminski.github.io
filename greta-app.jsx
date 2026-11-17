@@ -20571,7 +20571,7 @@ function V3HomeGoals({ q, gc, unreported }) {
         + (g.pace_finish != null ? ', ' + v3GbpRound(g.pace_finish) + ' at today’s pace' : '')}/>
     {goalSales > 0 && salesFc != null && <V3HomeGoalRow name="Sales" pill={short > 0 ? v3GbpRound(short) + ' short' : 'On track'} pillCls={short > 0 ? 'v3-pill-bad' : 'v3-pill-good'}
       line={'Plan lands ' + v3GbpRound(salesFc) + ' of ' + v3GbpRound(goalSales) + ' goal'}
-      title={A.owner_question || undefined} atGoal={goalSales} soFar={salesSoFar || 0} exp={salesExp}
+      title={A.owner_question ? String(A.owner_question).replace(/[.?]$/, '') : undefined} atGoal={goalSales} soFar={salesSoFar || 0} exp={salesExp}
       so={salesSoFar != null ? soLine(salesSoFar) + ', ' + v3GbpRound(salesExp) + ' expected by now' : ''}/>}
     {V.close && <p className="v3-panel-note">{v3GbpRound(unreported)} of ad spend has not come through yet, enough to move the forecast either way.</p>}
     {gc && gc.stale && <p className="v3-panel-note">The plan has changed since this goal was confirmed. <button type="button" className="v3-panel-link" onClick={go}>Re-plan</button></p>}
