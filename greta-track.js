@@ -82,6 +82,11 @@
         props: props && typeof props === 'object' ? props : {},
         session_id: sid
       };
+      // 1272: vw_owner_events leaves out automated and local sessions (evals, the dev harness)
+      try {
+        if (row.props.host == null) row.props.host = location.hostname || null;
+        if (row.props.automated == null && navigator.webdriver === true) row.props.automated = true;
+      } catch (e) {}
       if (!row.brand_id || !client()) {
         if (pending.length < MAX_PENDING) pending.push(row);
         return;

@@ -17392,6 +17392,8 @@ function v3PlainAction(row){
     return P('Show ' + x[1] + ' to more shoppers',
       'It keeps ' + x[2] + 'p of every £1 after product cost, and its sales are growing, but few people see it. More space on the site and in bundles turns that into profit.');
   }
+  // the emitter's wording since Nov: "<product> keeps 88% of its price after product costs and its sales are growing"
+  if (/^product-hero_underexposed/.test(id) && (x = m(/^(?:The )?(.+?) keeps [\d.]+% of its price after product costs/))) return P('Show ' + x[1] + ' to more shoppers', raw);
   if (/^pulse-cro-fix-/.test(id)) {
     // "Fix the discount_value JS error on the cart Checkout button — it blocks cart→checkout."
     // "Fix the Judge.me JS error on PDPs (silently breaks the ATC button)."
@@ -17417,7 +17419,7 @@ function v3PlainAction(row){
   if (id === 'cash-inputs' && /without today's bank balance/.test(raw)) return P('Enter today’s bank balance', raw);
   if (id === 'google-split-brand') return P('Split Google campaigns into new and returning customers', raw);
   if (id === 'site-errors') return P('Find and fix the errors on your site', raw);
-  if (/^returns-product-/.test(id)) { const nm = (raw.match(/with "([^"]+)" in them/) || [])[1];
+  if (/^returns-product-/.test(id)) { const nm = (raw.match(/with "([^"]+)" in them/) || raw.match(/^"([^"]+)" itself was refunded/) || [])[1];
     return P(nm ? 'Find out why ' + nm + ' comes back so often' : 'Find out why one product comes back so often', raw); }
   if (id === 'seo-nonbrand') { const t = (raw.match(/"([^"]+)"/) || [])[1];
     return P(t ? 'Move up Google for "' + t + '" and the other searches you nearly win' : 'Move up Google for the searches you nearly win', raw); }
@@ -21560,7 +21562,7 @@ function V3GrowthYear() {
     <div className="v3-panel-pad v3-mk-charts v3-gy-one">
       <figure className="v3-chart" aria-label="Sales by month"><figcaption><span className="v3-chart-title">Sales by month</span>
         <span className="v3-legend"><i style={{ background: PAL.quiet }}/>Last year <i style={{ background: PAL.sales }}/>Plan</span></figcaption>
-        <R.ResponsiveContainer width="100%" height={220}>
+        <R.ResponsiveContainer width="100%" height={240}>
           <R.BarChart data={M} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
             <R.CartesianGrid vertical={false}/>
             <R.XAxis dataKey="month" tickFormatter={mo => v3Month(mo)} interval="preserveStartEnd"/>
@@ -25536,8 +25538,12 @@ function V3TrackRecord() {
 // It replaced the "All closed actions" fold, V3TrackRecord, whose done list repeated the results above it.
 function V3ClosedActions() {
   const q = useV3Rows('act-track', (sb, b) => sb.from('actions')
-    .select('external_id,description,category,status,disposition_at,raised_at,verdict,predicted_window_days,predicted_metric_id,predicted_direction,grade:metadata->grade,auto:metadata->auto_closed_at,sup:metadata->suppressed_at')
+    .select('external_id,description,category,status,disposition_at,raised_at,verdict,predicted_window_days,predicted_metric_id,predicted_direction,grade:metadata->grade,auto:metadata->auto_closed_at,sup:metadata->suppressed_at,why:metadata->>close_reason')
     .eq('brand_id', b).in('status', ['done', 'skipped', 'partial']).order('disposition_at', { ascending: false, nullsFirst: false }).limit(200));
+  // 1272: why each closed itself (action_close_reason), and the rows taken off the board while open (vw_action_left_board)
+  const why = useV3Rows('close-reasons', sb => sb.from('action_close_reason').select('code,words').limit(200));
+  const left = useV3Rows('left-board', (sb, b) => sb.from('vw_action_left_board').select('external_id,description,category,archived_at,reason')
+    .eq('brand_id', b).order('archived_at', { ascending: false }).limit(50));
   const bj = useV3Rows('brand-joined', (sb, b) => sb.from('brands').select('created_at').eq('id', b).limit(1));
   const res = useV3Rows('brand-results', V3_RESULTS_Q);
   const [tab, setTab] = React.useState(null);
@@ -25549,11 +25555,16 @@ function V3ClosedActions() {
   // tasks imported from before the brand joined Greta are not its record (0958)
   const own = joined ? q.rows.filter(r => !r.raised_at || String(r.raised_at) >= joined) : q.rows;
   const R0 = res.rows && res.rows[0], inResults = new Set((R0 && Array.isArray(R0.rows) ? R0.rows : []).map(r => r.external_id));
-  const isAuto = r => (r.auto && r.status === 'done') || (r.sup && r.status === 'skipped');
+  const isAuto = r => !!r.auto || (r.sup && r.status === 'skipped');
+  const words = {}; (why.rows || []).forEach(w => { words[w.code] = w.words; });
+  const reasonOf = r => r.reason || (r.why && words[r.why]) || 'What raised it is no longer there';
+  const gone = (left.rows || []).map(x => ({ external_id: x.external_id, description: x.description, category: x.category, status: 'removed', disposition_at: x.archived_at,
+    reason: !x.reason || x.reason === 'removed_while_open' || /^Taken off/.test(x.reason) ? 'What raised it was no longer there' : (words[x.reason] || x.reason) }));
+  const autoRows = own.filter(isAuto).concat(gone).sort((p, q) => String(q.disposition_at || '').localeCompare(String(p.disposition_at || '')));
   const groups = [
     ['done', 'Done', own.filter(r => !isAuto(r) && (r.status === 'done' || r.status === 'partial') && !inResults.has(r.external_id))],
     ['skipped', 'Skipped', own.filter(r => !isAuto(r) && r.status === 'skipped')],
-    ['auto', 'Closed automatically', own.filter(isAuto)],
+    ['auto', 'Closed automatically', autoRows],
   ].filter(g => g[2].length > 0);
   if (!groups.length) return null;
   const cur = groups.find(g => g[0] === tab) || groups[0];
@@ -25572,13 +25583,14 @@ function V3ClosedActions() {
       {groups.map(g => (<button key={g[0]} type="button" role="tab" aria-selected={cur[0] === g[0]} className={'v3-tab' + (cur[0] === g[0] ? ' on' : '')}
         onClick={() => { setTab(g[0]); setAll(false); }}>{g[1]} <span className="v3-tab-n">{fmtCount(g[2].length)}</span></button>))}
     </div>}
-    {cur[0] === 'auto' && <p className="v3-panel-note">Closed when what raised the action was no longer there. Not graded as things you did.</p>}
+    {cur[0] === 'auto' && <p className="v3-panel-note">Closed or taken off the board without a decision from you. Not graded as things you did.</p>}
     <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-closed-rows">
-      <thead><tr><th>Action</th><th className="v3-mk-opt">Area</th>{cur[0] === 'done' && <th>Result</th>}{many && <th className="r">Times</th>}<th className="r">{many ? 'Last closed' : 'Closed'}</th></tr></thead>
+      <thead><tr><th>Action</th><th className="v3-mk-opt">Area</th>{cur[0] === 'done' && <th>Result</th>}{cur[0] === 'auto' && <th>Reason</th>}{many && <th className="r">Times</th>}<th className="r">{many ? 'Last closed' : 'Closed'}</th></tr></thead>
       <tbody>{rows.map(({ r, n }, i) => (<tr key={r.external_id + i}>
         <td className="v3-web-wrap">{v3PlainAction(r).title}</td>
         <td className="v3-mk-opt">{r.category ? v3CategoryWords(r.category) : FMT_NONE}</td>
         {cur[0] === 'done' && <td>{result(r)}</td>}
+        {cur[0] === 'auto' && <td className="v3-web-wrap">{r.status === 'removed' ? 'Taken off the board: ' + reasonOf(r).charAt(0).toLowerCase() + reasonOf(r).slice(1) : reasonOf(r)}</td>}
         {many && <td className="r">{fmtCount(n)}</td>}
         <td className="r">{r.disposition_at ? v3Day(r.disposition_at, true) : FMT_NONE}</td>
       </tr>))}</tbody>
