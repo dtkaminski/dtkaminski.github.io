@@ -18955,7 +18955,8 @@ function V3MoveWho({ ext }) {
   const who = !a ? 'Nobody yet' : a.kind === 'agency' ? a.label + ' (agency)' : a.user_id && a.user_id === uid ? 'You' : a.label;
   const late = Number(m.overdue_days) > 0;
   const why = m.due_from === 'deadline' ? ', the order-by date' : m.due_from === 'week' ? ', a week from taking it on' : '';
-  const people = (team.rows || []).filter(p => p && p.user_id);
+  // 1280: a viewer can read a move but cannot mark it done, so a move is not given to one
+  const people = (team.rows || []).filter(p => p && p.user_id && p.role !== 'viewer');
   const open = () => {
     setPick(a && a.kind === 'agency' ? 'agency' : a && a.user_id ? 'user:' + a.user_id : uid ? 'user:' + uid : 'owner');
     setAgency(a && a.kind === 'agency' ? a.label : ''); setDue(m.due_on || v3IsoAdd(today, 7)); setErr(''); setEdit(true);
@@ -26688,6 +26689,13 @@ function V3Team() {
     if (!ok) { setMsg({ kind: 'err', text: data.detail || data.error || 'Could not change that role.' }); return; }
     setMsg({ kind: 'ok', text: m.email + ' is now ' + (V3_ROLE_HELP.find(r => r[0] === next) || [, next])[1].toLowerCase() + '.' }); load();
   };
+  // 1280: the verdict says "send it again" for an invite nobody opened; this is that button
+  const resend = async (m) => {
+    setMsg(null);
+    let origin = ''; try { origin = (window.top || window).location.origin; } catch (_) { origin = window.location.origin; }
+    const { ok, data } = await call('resend', { target_user_id: m.user_id, redirect_to: origin + '/auth/workspace.html' });
+    setMsg(ok ? { kind: 'ok', text: data.message || 'Sent again.' } : { kind: 'err', text: data.detail || data.error || 'The invite did not go out.' });
+  };
   const remove = async (m) => {
     const ask = m.is_self ? 'Leave this workspace? You will lose access immediately.' : 'Remove ' + m.email + ' from ' + brandName + '?';
     if (!window.confirm(ask)) return;
@@ -26721,7 +26729,10 @@ function V3Team() {
             : v3Sentence(m.role)}</td>
           <td className="t-text">{m.activity ? ((m.last_active_at || m.last_sign_in_at) ? v3Ago(m.last_active_at || m.last_sign_in_at) : <span className="v3-down">never, invite not accepted</span>) : FMT_NONE}</td>
           <td className="t-text v3-muted">{did(m)}</td>
-          <td>{(canTarget(m) || (m.is_self && m.role !== 'owner')) && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => remove(m)}>{m.is_self ? 'Leave' : 'Remove'}</button>}</td>
+          <td><span className="v3-team-btns">
+            {canTarget(m) && m.activity && !m.last_sign_in_at && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => resend(m)}>Send again</button>}
+            {(canTarget(m) || (m.is_self && m.role !== 'owner')) && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => remove(m)}>{m.is_self ? 'Leave' : 'Remove'}</button>}
+          </span></td>
         </tr>))}</tbody>
       </table>
       <p className="micro muted v3-measure">Last active is the latest sign-in, session, question, decision or note. Decisions are actions marked done or skipped on the board (recorded from 5 Oct 2026). Notes are from the weekly review. Questions are the ones asked of Greta.</p>
