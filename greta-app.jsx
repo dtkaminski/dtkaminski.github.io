@@ -22241,7 +22241,7 @@ function V3Website({ start, period, customActive }) {
   const dev = useV3Rows('web-device-long', (sb, b) => stretches((a, z) => sb.from('tenant_clarity_daily')
     .select('date,dim_value,sessions_count').eq('brand_id', b).eq('num_days', 1).eq('metric_name', 'Device').gte('date', v3IsoAdd(today, a)).lt('date', v3IsoAdd(today, z)).limit(1000), [-400, -200, 1]));
   const ord = useV3Rows('web-orders-long', (sb, b) => sb.from('v_tenant_shopify_daily_agg')
-    .select('day,order_count').eq('brand_id', b).gte('day', v3IsoAdd(today, -400)).order('day', { ascending: false }).limit(1000));
+    .select('day,order_count,refunded_in_full').eq('brand_id', b).gte('day', v3IsoAdd(today, -400)).order('day', { ascending: false }).limit(1000));
   const rows = loop.rows || [];
   const mo = rows.length ? rows[0].mo : null;
   const raw = rows.filter(r => r.mo === mo).sort((a, b) => a.stage_no - b.stage_no);
@@ -22269,7 +22269,8 @@ function V3Website({ start, period, customActive }) {
     const end = endPick && endPick < last ? endPick : last;
     const viewLen = onFig ? 30 : Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1);
     const len = onFig ? 30 : v3WindowStep(viewLen), whole = len === viewLen;
-    const ordBy = {}; ord.rows.forEach(r => { const d = v3Iso10(r.day); ordBy[d] = (ordBy[d] || 0) + (Number(r.order_count) || 0); });
+    // 1275: orders placed, refunded ones included, the count Home shows (338 here against 344 on frkl)
+    const ordBy = {}; ord.rows.forEach(r => { const d = v3Iso10(r.day); ordBy[d] = (ordBy[d] || 0) + (Number(r.order_count) || 0) + (Number(r.refunded_in_full) || 0); });
     const devBy = {}; (dev.rows || []).forEach(r => { const d = v3Iso10(r.date), o = devBy[d] || (devBy[d] = { mobile: 0, all: 0 }), n = Number(r.sessions_count) || 0; o.all += n; if (String(r.dim_value || '').toLowerCase() === 'mobile') o.mobile += n; });
     const byMetric = {}; cl.rows.forEach(r => { (byMetric[r.metric_name] || (byMetric[r.metric_name] = [])).push({ ...r, d: v3Iso10(r.date) }); });
     const read = w => {
@@ -24049,7 +24050,17 @@ function V3MarketingPage({ start, period, customActive }) {
   const shown = live.slice(0, 5);
   const bmRows = bm.rows && bm.rows[0] && Array.isArray(bm.rows[0].rows) ? bm.rows[0].rows : [];
   const open = drawer && shown.find(r => r.external_id === drawer.id);
-  const ceil = (() => { const U = (ue.rows || [])[0]; return U && Number(U.allowable_cac) > 0 ? Number(U.allowable_cac) : null; })();
+  // 1275: the bar is the registered figure (state.unit.affordable_cac, the anatomy's), on the brand's own basis; the
+  // 12-month allowance read £60 here against £45 everywhere else on frkl. The view's figure stands only without it.
+  const ceilF = v3Fig('affordable_cac', figQ.rows).value;
+  const ceil = ceilF > 0 ? ceilF : (() => { const U = (ue.rows || [])[0]; return U && Number(U.allowable_cac) > 0 ? Number(U.allowable_cac) : null; })();
+  const ceilLife = (() => {
+    if (!(ceilF > 0)) return true;
+    const b = stQ.rows && stQ.rows[0] && stQ.rows[0].unit && stQ.rows[0].unit.affordable_cac_basis;
+    if (b) return b === 'lifetime';
+    const fo = v3Fig('first_order_profit', figQ.rows).value;
+    return !(fo != null && Math.abs(fo - ceilF) < 0.5);
+  })();
 
   return (<div className="v3-home v3-profit v3-marketing">
     <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
@@ -24134,7 +24145,7 @@ function V3MarketingPage({ start, period, customActive }) {
           <td>{v3Day(w.e, true)}</td><td className="r">{fmtMoney(w.spend)}</td><td className="r">{w.nc == null ? FMT_NONE : fmtCount(w.nc)}</td>
           <td className={'r' + (ceil != null && w.cac > ceil ? ' v3-down' : '')}>{w.cac == null ? FMT_NONE : fmtMoney(w.cac)}</td><td className="r">{w.mer == null ? FMT_NONE : fmtMoney(w.mer, 2)}</td>
         </tr>))}</tbody></table></div>
-      {ceil != null && <p className="v3-panel-note">The most a new customer can cost: {fmtMoney(ceil)}, the profit on their first order plus a year of repeat orders.</p>}
+      {ceil != null && <p className="v3-panel-note">The most a new customer can cost: {fmtMoney(ceil)}, {ceilLife ? 'the profit on their first order plus a year of repeat orders' : 'the profit on their first order'}.</p>}
     </section>}
   </div>);
 }
@@ -24169,7 +24180,7 @@ function V3ChannelMap() {
     <div className="v3-panel-head"><h2>Sales by channel</h2><span className="v3-muted">30 days to {v3Day(M.window && M.window.to, true)}</span>
       {rows.length > 6 && <button type="button" className="v3-panel-link" onClick={() => setAll(v => !v)}>{all ? 'Show top 6' : 'Show all ' + rows.length}</button>}</div>
     <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
-      <thead><tr><th>Channel</th><th className="r">Sales</th><th className="r">Share</th><th className="r v3-mk-opt">Share, 30 days before</th><th className="r v3-mk-opt">New customers</th>
+      <thead><tr><th>Channel</th><th className="r">Sales</th><th className="r">Last-click share</th><th className="r v3-mk-opt">Share, 30 days before</th><th className="r v3-mk-opt">New customers</th>
         <th className="r" title={'How Google Analytics shares out all the sales it saw, by its own rules' + (cover ? ' (' + cover + '% of orders, the visitors who accept cookies)' : '') + ': a second opinion on the mix, not where the untraced sales came from.'}>Google Analytics’ share</th></tr></thead>
       <tbody>{shown.map(c => (<tr key={c.key}>
         <td>{c.label}</td><td className="r">{fmtMoney(c.sales)}</td><td className="r">{pct(c.share)}</td><td className="r v3-mk-opt">{pct(c.share_prior)}</td>
@@ -28989,10 +29000,13 @@ function V3GoldenRule() {
   const g = useV3Rows('golden-rule', V3_GR_Q);
   const t = useV3Rows('tier-30', V3_TIER_Q);
   const s = useV3Rows('brand-state', V3_STATE_Q);
+  const fg = useV3Figures();
   if (g.err || !g.rows || !g.rows.length) return null;
   const r = g.rows[0], ret = Number(r.returning_cm_month), opex = Number(r.opex_month);
   if (!(opex > 0) || r.returning_cm_month == null) return null;
-  const met = !!r.golden_rule_met, tr = t.rows && t.rows[0], amer = tr && tr.amer != null ? Number(tr.amer) : null;
+  // 1275: the registered figure, as Home shows it (the tiers' after-refunds count read £1.44 against £1.52)
+  const fAmer = v3Fig('amer_30d', fg.rows).value;
+  const met = !!r.golden_rule_met, tr = t.rows && t.rows[0], amer = fAmer != null ? fAmer : tr && tr.amer != null ? Number(tr.amer) : null;
   const st = s.rows && s.rows[0], be = st && st.ads && st.ads.break_even_return != null ? Number(st.ads.break_even_return) : null;
   const top = Math.max(ret, opex) || 1;
   const row = (k, v, c) => (<tr key={k}><td>{k}</td><td className="bar"><i className={'v3-home-pl-' + c} style={{ width: Math.max(0.6, v / top * 100) + '%' }}/></td><td className="r">{fmtMoney(v)}</td></tr>);
