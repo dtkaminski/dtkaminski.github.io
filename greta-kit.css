@@ -2466,6 +2466,7 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 @media (max-width: 767px) { .v3-page-head[data-fixed-period] .v3-period { display: none; } }
 .v3-mk-ad-name { padding: 0; background: none; border: 0; font: inherit; color: var(--color-ink); text-align: left; cursor: pointer; }
 .v3-mk-ad-name:hover { text-decoration: underline; }
+.v3-mk-off-tag { margin-left: var(--space-2); color: var(--color-muted); font-size: var(--text-xs); white-space: nowrap; }  /* 1292: a flow that sent in the window, switched off since */
 .v3-main .v3-marketing table.v3-mk-ads td { vertical-align: middle; }
 .v3-main .v3-marketing table.v3-mk-ads td:first-child { white-space: normal; }
 .v3-mk-spark { width: var(--size-mk-spark); min-width: var(--size-mk-spark); }
