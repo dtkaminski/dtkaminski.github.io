@@ -19027,15 +19027,33 @@ const V3_ALERTS_Q = (sb, b) => sb.rpc('fn_morning_alerts', { p_brand: b })
   .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
 function V3MorningAlerts() {
   const q = useV3Rows('morning-alerts', V3_ALERTS_Q);
+  const st = useV3Rows('brand-state', V3_STATE_Q);
+  const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
   const board = useV3Board();
-  if (q.err || !q.rows || !q.rows[0]) return null;
-  const all = (Array.isArray(q.rows[0].alerts) ? q.rows[0].alerts : []).filter(a => a.kind !== 'feed');
-  if (!all.length) return null;
+  const all = q.err || !q.rows || !q.rows[0] ? [] : (Array.isArray(q.rows[0].alerts) ? q.rows[0].alerts : []).filter(a => a.kind !== 'feed');
+  // 18 Nov: a peak that starts within a week, or is under way, is the morning's news. Home said nothing of frkl's Black
+  // Friday two days before it; the Calendar strip had it. Same state (peak_now first, 1268), same words as that strip.
+  const S0 = st.rows && st.rows[0];
+  const Pk = S0 && (S0.peak_now || S0.peak);
+  const pkUw = !!(Pk && Pk.days_left != null);
+  const pkIn = Pk && !pkUw && Pk.days_away != null ? Number(Pk.days_away) : null;
+  const peak = Pk && Pk.title && (pkUw || (pkIn != null && pkIn >= 0 && pkIn <= 7)) ? Pk : null;
+  if (!all.length && !peak) return null;
   const title = ext => { const r = (board.rows || []).find(x => x.external_id === ext); return r ? v3PlainAction(r).title : ext; };
   const when = (n, iso) => n <= 0 ? 'today' : n === 1 ? 'tomorrow' : 'in ' + n + ' days, on ' + v3Day(iso);
-  return (<section className="v3-ma" role="status">
+  const BM = bm.rows && bm.rows[0];
+  const pkPlan = peak && BM && Array.isArray(BM.rows) ? BM.rows.find(r => r.external_id === 'promo-peak-plan') : null;
+  // the plan's own row is on Goal ("The plan and ad budget"); on Actions it is a step under the stock order
+  const go = () => window.__oiGo && window.__oiGo('goal', null, 'promo-peak-plan');
+  return (<section className={'v3-ma' + (all.length ? '' : ' v3-ma-calm')} role="status">
     <p className="v3-goal-lab">This morning</p>
-    <ul>{all.map(a => <li key={a.key} className={'v3-ma-line v3-ma-' + a.kind}>
+    <ul>{peak && <li key="peak" className="v3-ma-line v3-ma-peak">
+      <b>{v3PlainWords(peak.title)}</b>{pkUw
+        ? <> is under way: day {fmtCount(Number(peak.day_no))} of {fmtCount(Number(peak.days))}, {fmtCount(Number(peak.days_left))} {Number(peak.days_left) === 1 ? 'day' : 'days'} left.</>
+        : <> starts {when(pkIn, String(peak.start).slice(0, 10))}.</>}
+      {pkPlan && <>{pkPlan.taken_on ? '' : ' Nobody has taken its plan on yet.'}{' '}<button type="button" className="v3-xref" onClick={go}>Open the plan</button></>}
+    </li>}
+    {all.map(a => <li key={a.key} className={'v3-ma-line v3-ma-' + a.kind}>
       {a.kind === 'goal_off' && <><b>Your goal slipped off track overnight.</b> You are now on course {Number(a.forecast) < 0 ? 'to lose ' + v3Gbp(Math.abs(Number(a.forecast))) : 'for ' + v3Gbp(a.forecast)} after ads by {v3Day(a.period_end)}, <span className="v3-res-fig">{v3Gbp(a.gap)}</span> short of your goal.</>}
       {a.kind === 'late' && <><b>{title(a.external_id)}</b> is {a.days === 1 ? 'a day' : a.days + ' days'} late: it was due {v3Day(a.due_on)}{a.assignee && a.assignee.label ? ', with ' + a.assignee.label : ''}.</>}
       {a.kind === 'deadline' && <><b>{title(a.external_id)}</b>: its order-by date is {when(a.days, a.deadline)}.{a.taken_on ? '' : ' Nobody has taken it on yet.'}</>}
@@ -22123,7 +22141,7 @@ function V3Stock() {
           {afterPk ? <>{' '}For {pkName}, {fmtCount(SM.units_peak)} more units{num(SM.order_cost_peak_gbp) > 0 ? <> (about {v3About(SM.order_cost_peak_gbp)})</> : null} would help, but stock ordered today lands after it: order those only if a supplier can deliver them{pkBy ? <> by <b>{v3Day(pkBy)}</b></> : null}.</> : null}
           {preN > 0 && owedN > 0 ? <>{' '}{preN === order.length ? 'All of them sell' : fmtCount(preN) + ' of them sell'} on pre-order: Shopify keeps selling them when out, so they lose no sales, and customers have already bought <b>{fmtCount(owedN)} units</b> you do not hold yet. The order includes them.</> : null}
           {' '}{SM.at_stake_basis && <V3Conf state="probably" detail={SM.at_stake_basis + (SM.rule ? ' ' + SM.rule : '')}/>}</V3Brief>
-      </>) : <p className="v3-note v3-measure">Every product that sells has enough stock to last until a new order could arrive{pk ? ', and through ' + pkName + ' at last year’s sales' : ''}.</p>}
+      </>) : <p className="v3-note v3-measure">Every product that sells has enough stock to last until a new order could arrive{pk && SM.peak ? ', and through ' + pkName + ' at last year’s sales' : ''}.</p>}
       </div>{order.length > 0 && <V3MoveRunway lead peakOn={pk ? pk.start : null}/>}</div>
       {order.length > 0 ? (<>
         {lost > 0 && <div className="v3-sowhat"><span>Waiting costs <b>{v3GbpRound(lost)}</b> of profit, whatever you order now. Only faster delivery saves it: each week your supplier can cut is worth <b>{v3GbpRound(sooner)}</b>{pkLate ? ', more in the peak' : ''}.</span>
@@ -24862,7 +24880,10 @@ function useV3PeakDeadline(start, leadDays) {
 function useV3Peak(leadDays) {
   const today = new Date().toISOString().slice(0, 10);
   const cal = useV3Rows('stock-cal', (sb, b) => sb.from('vw_calendar_grid').select('title,start_date,end_date,row_group')
-    .eq('brand_id', b).eq('row_group', 'seasonality').gte('start_date', v3IsoAdd(today, 7)).lte('start_date', v3IsoAdd(today, 120)).limit(200));
+    // 18 Nov: to the day before the peak. From 7 days out the page dropped it, and with it what to feature, what to keep
+    // out of the ads and how deep to go, in the week those matter most (frkl, 13 to 19 Nov). The order list's own peak
+    // stops a week out, when peak stock should be in (fn_peak_stock_deadline).
+    .eq('brand_id', b).eq('row_group', 'seasonality').gte('start_date', v3IsoAdd(today, 1)).lte('start_date', v3IsoAdd(today, 120)).limit(200));
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   // product status, so last year's sellers that are archived read "no longer sold", not "missing"
   const prods = useV3Rows('stock-prod-status', (sb, b) => sb.from('tenant_shopify_products').select('title,status').eq('brand_id', b).limit(3000));
@@ -25301,7 +25322,9 @@ function V3GoalActions({ prefixes, words, sub }) {
   const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
   useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
   const [drawer, setDrawer] = React.useState(null);
-  const live = v3FoldPlans(v3LiveRows(bd.rows || [])).filter(r => prefixes.some(p => String(r.external_id || '').startsWith(p)));
+  // 18 Nov: the page's rows first, then the fold. Folding the whole board first dropped a step whose plan is led from
+  // another page: the peak plan (under the stock order, 1110) never showed in "The plan and ad budget" here.
+  const live = v3FoldPlans(v3LiveRows(bd.rows || []).filter(r => prefixes.some(p => String(r.external_id || '').startsWith(p))));
   const shown = live.slice(0, 5);
   const bmRows = bm.rows && bm.rows[0] && Array.isArray(bm.rows[0].rows) ? bm.rows[0].rows : [];
   const open = drawer && shown.find(r => r.external_id === drawer.id);

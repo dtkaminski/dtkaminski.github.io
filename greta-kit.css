@@ -1430,6 +1430,9 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-ma-line { font-size: var(--text-sm); line-height: var(--leading-body); color: var(--color-secondary); }
 .v3-ma-line b { font-weight: var(--weight-semi); color: var(--color-ink); }
 .v3-ma-goal_off b, .v3-ma-late b { color: var(--color-danger); }
+/* 18 Nov: the peak line alone is news, not a fault, so the rule beside it is the neutral line */
+.v3-ma-calm { border-left-color: var(--color-line-strong); }
+.v3-ma-line .v3-xref { display: inline; width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; font: inherit; font-weight: var(--weight-medium); color: var(--color-ink); text-decoration: underline; text-decoration-color: var(--color-line-strong); text-underline-offset: 2px; cursor: pointer; }
 /* 1113: Results, one ruled row per move, the label as the goal strip's chip */
 .v3-res-fig { font-family: var(--font-mono); font-weight: var(--weight-semi); }
 .v3-res-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); margin: var(--space-2) 0 var(--space-3);
