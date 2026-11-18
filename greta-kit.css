@@ -2192,7 +2192,11 @@ button.v3-home-tile:hover, button.v3-home-tile.open { background: var(--color-pa
   .v3-main table.v3-home-table td.v3-home-worth { text-align: left; }
 }
 @media (max-width: 760px) {
-  .v3-home-table tr { grid-template-columns: minmax(0, 1fr) auto; }
+  /* 18 Nov: the status control keeps its width and a long link label wraps beside it ("Open Meta Ads Manager:
+     campaigns" squeezed the control to 47px, showing "T") */
+  .v3-home-table tr { grid-template-columns: minmax(var(--size-home-status), 1fr) auto; }
+  .v3-main table.v3-home-table td.v3-home-open { min-width: 0; }
+  .v3-main table.v3-home-table td.v3-home-open .v3-btn { white-space: normal; text-align: center; }
   .v3-main table.v3-home-table td.v3-home-area { grid-column: 1; grid-row: 2; }
   .v3-main table.v3-home-table td.v3-home-worth { grid-column: 2; grid-row: 2 / span 2; text-align: right; }
   .v3-main table.v3-home-table td.v3-home-basis { grid-column: 1; grid-row: 3; }

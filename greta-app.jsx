@@ -12162,7 +12162,9 @@ function CommandMenu(){
   // 3 Nov: the box takes a question as well as a page; it said "No matches" to anything a page is not called.
   if (UI_V3 && q.trim()) filtered.push({ label: 'Ask Greta: ' + q.trim(), sub: 'Ask', icon: 'spark', ask: q.trim() });
   if(!open) return null;
-  const go = (it) => { setOpen(false); if (it.ask && window.__oiAsk) window.__oiAsk(it.ask, { send: true }); else if (it.v3 && window.__oiGo) window.__oiGo(it.v3); else if(window.__oiNav) window.__oiNav(it.section, it.subId); };
+  // 18 Nov: a search word that is not a page opens Ask with the words in the box; it no longer asks at once (Enter on
+  // "email" spent a question). The Ask bar still sends: there the owner typed a question.
+  const go = (it) => { setOpen(false); if (it.ask && window.__oiAsk) window.__oiAsk(it.ask); else if (it.v3 && window.__oiGo) window.__oiGo(it.v3); else if(window.__oiNav) window.__oiNav(it.section, it.subId); };
   const onKeyDown = (e) => {
     if(e.key==='ArrowDown'){ e.preventDefault(); setSel(s=>Math.min(s+1, filtered.length-1)); }
     else if(e.key==='ArrowUp'){ e.preventDefault(); setSel(s=>Math.max(s-1, 0)); }
@@ -15644,7 +15646,7 @@ function ConnectionsPanel(){
     {connectMsg && !formOpen && <p className={connectMsg.kind === 'ok' ? 'v3-note v3-ok' : 'v3-note v3-bad'} role="status">{connectMsg.text}</p>}
 
     {formOpen && (<section className="v3-sec" id="v3-shopify-connect">
-      <h2 className="v3-sec-title">Connect Shopify</h2>
+      <h2 className="v3-sec-title">{LIVE_CONNS.some(x => x.provider === 'shopify') ? 'Reconnect Shopify' : 'Connect Shopify'}</h2>
       <p className="v3-note v3-measure">Greta reads your store through a private app you make in your own Shopify account. It takes ten minutes, once, and the app can only read.</p>
       <ol className="v3-rank-steps">
         <li>Sign in at <b>dev.shopify.com</b> with the account that owns your store, and create an app called Greta.</li>
@@ -16401,7 +16403,11 @@ function MarginNudge(){
     return ()=>window.removeEventListener('oi-config-updated', h);
   }, [check]);
 
-  if(!authed || status!=='unset' || dismissed) return null;
+  // 18 Nov: while the shop's own feed has stopped, costs switch nothing on; the page's first step is to reconnect it
+  // (testio offered "Add your costs" beside "Reconnect" on every page). UI_V3 is fixed for the page, so the hook order holds.
+  const stQ = UI_V3 ? useV3Rows('brand-state', V3_STATE_Q) : null;
+  const coreStale = !!(stQ && stQ.rows && stQ.rows[0] && stQ.rows[0].freshness && stQ.rows[0].freshness.core_stale);
+  if(!authed || status!=='unset' || dismissed || coreStale) return null;
   return (
     <div style={{
         display:'flex', alignItems:'center', gap:'var(--s-4)', marginBottom:'var(--s-5)',
@@ -16416,7 +16422,7 @@ function MarginNudge(){
       </div>
       {/* Straight to the margin field — on Goal & costs itself this used to do nothing at all. */}
       <button type="button" className="v3-btn v3-btn-p" onClick={()=>window.__oiGo&&window.__oiGo('goal','margin')} style={{flexShrink:0}}>
-        Add your costs →
+        Add your costs
       </button>
       <button onClick={()=>setDismissed(true)} title="Dismiss for now" aria-label="Dismiss"
         style={{flexShrink:0, background:'none', border:0, cursor:'pointer', color:'var(--text-muted)', fontSize:'var(--text-base)', lineHeight:1, padding:'4px 6px'}}><Icon name="close" size={14}/></button>
@@ -20345,7 +20351,8 @@ function V3Tree({ rows, edges, onPath, onOpen, goal, openId }) {
           onClick={() => open(x)} onMouseEnter={() => setHi(x.id)} onFocus={() => setHi(x.id)} onBlur={() => setHi(null)}>
           <V3LightDot light={x.light}/>
           <span className="v3-node-l">{x.label}</span>
-          <span className="v3-node-x">{x.line || ((x.value_text ? x.value_text + ', ' : '') + V3_LIGHT_WORD.grey.toLowerCase())}</span>
+          {/* 18 Nov: no ad account is not £0 of ads judged later (Tranquillity: "Ad spend £0, not judged yet") */}
+          <span className="v3-node-x">{x.line || (/^(ad_spend|paid_spend)$/.test(String(x.id)) && v3NoAdAccount() ? 'No ad account' : (x.value_text ? x.value_text + ', ' : '') + V3_LIGHT_WORD.grey.toLowerCase())}</span>
         </button>))}</li>))}</ol>
     </div>
     {F && (madeFrom.length + drivenBy.length + feeds.length) > 0 && <div className="v3-tree-links" aria-live="polite">
@@ -21972,7 +21979,10 @@ function V3Growth() {
             </R.BarChart>
           </R.ResponsiveContainer></figure>
       </div> : waiting ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
-        : <p className="v3-panel-note">{pts.length ? 'Charts show once there are four months of ad spend.' : 'Monthly figures did not load. Refresh the page, or check back once there are four months of ad spend.'}</p>}
+        : <p className="v3-panel-note">{pts.length || Array.isArray(P.spendCurvePoints)
+            // 18 Nov: the read came back (greta-plan-data sets the array, empty for a shop with no ad spend); only a
+            // missing array is a failed read. It said "did not load" for every shop without ads (Tranquillity, testio).
+            ? 'Charts show once there are four months of ad spend.' : 'Monthly figures did not load. Refresh the page, or check back once there are four months of ad spend.'}</p>}
     </section>
 
     {TGG && <V3AdAnswer panel action={toGoal} g={TGG}/>}
@@ -22170,9 +22180,10 @@ function V3Stock() {
       {order.length > 0 && <div className="v3-stat-grid">
         {stat('To order', fmtCount(order.length) + (order.length === 1 ? ' product' : ' products'), [outNow > 0 ? fmtCount(outNow) + ' already out' : preN > 0 ? '' : 'none out yet', preN > 0 ? fmtCount(preN) + ' on pre-order' : ''].filter(Boolean).join(', '))}
         {stat('Order cost', fmtMoney(cost), fmtCount(unitsAll) + ' units at landed cost')}
-        {protect != null && stat('Profit it protects', fmtMoney(protect) + ' a month', 'from ' + v3Day(land))}
+        {/* 18 Nov: a forecast, rounded (Halden "£34,048 a month" beside the row's "about £34,000") */}
+        {protect != null && stat('Profit it protects', v3About(protect) + ' a month', 'from ' + v3Day(land))}
         {afterPk && stat('Peak units', fmtCount(SM.units_peak), (num(SM.order_cost_peak_gbp) > 0 ? fmtMoney(SM.order_cost_peak_gbp) + ', ' : '') + (pkBy ? 'only if delivered by ' + v3Day(pkBy) : 'only if delivered before the peak'))}
-        {peakAt != null && !afterPk && stat('Peak sales it protects', fmtMoney(peakAt), 'once, over ' + pkName)}
+        {peakAt != null && !afterPk && stat('Peak sales it protects', v3About(peakAt), 'once, over ' + pkName)}
       </div>}
       <div className={order.length > 0 ? 'v3-lead2 v3-gap-top' : ''}><div>
       {order.length === 0 && <p className="v3-verdict">{verdict}</p>}
@@ -22211,7 +22222,7 @@ function V3Stock() {
             </span>
             <span className="v3-rw-days">{r.pre ? 'Pre-order' : r.days ? fmtCount(r.days) + (r.days === 1 ? ' day' : ' days') : 'Out now'}</span>
           </div></td>
-          <td>{fmtCount(r.units)} units</td>
+          <td>{fmtCount(r.units)} {Number(r.units) === 1 ? 'unit' : 'units'}</td>
           {anyPeak && <td className="v3-muted">{r.forPeak > 0 ? fmtCount(r.forPeak) : FMT_NONE}</td>}
           <td className="v3-muted">{r.cost != null ? fmtMoney(r.cost) : FMT_NONE}</td>
           <td>{r.risk > 0 ? fmtMoney(r.risk) : FMT_NONE}</td>
@@ -22243,7 +22254,7 @@ function V3Stock() {
 
     {noSku.length > 0 && (<section className="v3-sec">
       <h2 className="v3-sec-title">Products without a product code</h2>
-      <p className="v3-note v3-measure">{fmtCount(noSkuTitles)} products that sell have no product code (SKU) in Shopify. They made {fmtPctN(noSkuShare)} of the last four weeks’ sales. Greta tracks them by Shopify’s own reference number, so they are still in the order above. Add a product code to each in Shopify so your supplier order can show it. After you do, that product’s sales rate reads low for four weeks while its history catches up.</p>
+      <p className="v3-note v3-measure">{fmtCount(noSkuTitles)} products that sell have no product code (SKU) in Shopify. They made {fmtPctN(noSkuShare)} of the last four weeks’ sales. They are tracked by Shopify’s own reference number, so they are still in the order above. Add a product code to each in Shopify so your supplier order can show it. After you do, that product’s sales rate reads low for four weeks while its history catches up.</p>
     </section>)}
     </V3More>}
 
@@ -23184,7 +23195,8 @@ function V3Customers({ start, period, customActive }) {
   // What a customer is worth
   const day0 = (() => { const r = (front.rows || []).find(x => x.in_standard_basis && /day 0/.test(String(x.bucket))); return r ? Number(r.pct_of_12m_value) / 100 : null; })();
   const X = v3ExtraCustomers(moQ.rows);
-  const payback = c30F.value != null && foF.value > 0 ? Number(c30F.value) / Number(foF.value) : u && u.payback_orders != null ? Number(u.payback_orders) : null;
+  // 18 Nov: no ad spend, no cost to earn back (Tranquillity, no ad account: "Orders to earn back their cost 0.0")
+  const payback = Number(c30F.value) > 0 && foF.value > 0 ? Number(c30F.value) / Number(foF.value) : c30F.value == null && u && Number(u.payback_orders) > 0 ? Number(u.payback_orders) : null;
   const firstCv = cv.length ? cv[0] : null, lastCv = cv.length > 1 ? cv[cv.length - 1] : null;
   const measures = [
     ltv > 0 && ['What a customer is worth', fmtMoney(ltv), 'A year of profit after product and order costs'],
@@ -23197,9 +23209,10 @@ function V3Customers({ start, period, customActive }) {
     X && X.per != null && ['Cost of each extra customer', fmtMoney(X.per), 'Extra ad spend since ' + X.prevLab + (ltv > 0 && X.per > ltv ? ', more than a customer is worth' : '')],
     X && X.moved && X.dSpend > 0 && X.dNc <= 0 && ['Extra customers from extra ad spend', '0', 'Since ' + X.prevLab],
     R0 && R0.repeat_rate != null && ['Customers who ordered more than once', fmtPctN(Number(R0.repeat_rate)), ''],
-    gap != null && ['Usual gap between orders', fmtCount(gap) + ' days', ''],
+    gap != null && gap >= 1 && ['Usual gap between orders', fmtCount(gap) + ' days', ''],
     R0 && R0.orders_per_customer != null && ['Orders per customer', v3Fix2(R0.orders_per_customer), ''],
-    lastCv && firstCv && ['Sales per customer by ' + lastCv.label.toLowerCase(), fmtMoney(lastCv.v), fmtMoney(firstCv.v) + ' on the first order'],
+    // 18 Nov: a young shop's month 1 counts only the customers old enough to have one ("£55 / £59 on the first order")
+    lastCv && firstCv && cv.length >= 3 && ['Sales per customer by ' + lastCv.label.toLowerCase(), fmtMoney(lastCv.v), fmtMoney(firstCv.v) + ' on the first order'],
   ].filter(Boolean);
 
   const allWait = (!tierQ.rows && !tierQ.err) || (!nvr.rows && !nvr.err);
@@ -23210,7 +23223,7 @@ function V3Customers({ start, period, customActive }) {
     <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
       {allFailed ? <div className="v3-panel-pad"><V3LoadFailed what="Your customer figures" onRetry={() => { tierQ.retry(); nvr.retry(); ue.retry(); }}/></div>
         : allWait ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div>
-        : empty ? <p className="v3-panel-note">These figures come from your shop’s orders. Connect your shop on Connections &amp; data.</p>
+        : empty ? <p className="v3-panel-note">These figures come from your shop’s orders. {connExists('shopify') ? 'Reconnect' : 'Connect'} your shop on Connections &amp; data.</p>
         : <>
           <div className="v3-home-group" style={{ '--n': 4 }}>
             <div className="v3-home-group-h">{whenLabel}<span>{signsOn ? v3TrendHead([sNew, sCac, sNs, sRs]) : !onFig && havePrior ? 'against the period before' : ''}</span></div>
@@ -26014,6 +26027,8 @@ function V3Review() {
   }, [lad.rows, cmr, today, stq.rows]);
   const shop = (window.FRKL_DATA && window.FRKL_DATA.shopify) || [];
   if (lad.err) return <V3LoadFailed what="Your weeks" onRetry={lad.retry}/>;
+  // 18 Nov: no sales in the last 30 days leaves no margin to value a week with; that is not a failed read (testio)
+  if (!wk && lad.rows && Object.keys(H).length && !(Number(H.net_revenue_30d) > 0)) return <div className="v3-empty">No sales in the last 30 days, so there is no week to review.</div>;
   if (!wk) return <V3SkeletonRows n={4}/>;
   if (wk.length < 10) return <div className="v3-empty">The weekly review starts once there are ten full weeks of sales to compare with.</div>;
   // One basis: the registered week_sales, which Ask and the weekly email say, is sales before delivery, and so is every
@@ -26665,7 +26680,7 @@ function V3DataTrust() {
   if (Q && num(Q.lines_total) > 0 && num(Q.lines_costed) < num(Q.lines_total) * 0.97) {
     const miss = num(Q.lines_total) - num(Q.lines_costed);
     items.push({ k: 'nocost', short: fmtPctN(miss / num(Q.lines_total)) + ' of order lines have no product cost', head: fmtCount(miss) + ' of your last 90 days’ ' + fmtCount(Q.lines_total) + ' order lines have no product cost.',
-      body: <>Greta fills them in from your average margin, so profit on those products is a guess. Add their costs in Shopify (“Cost per item”) or here. <button type="button" className="v3-xref" onClick={go('goal', 'costs')}>Products with no cost yet <span className="v3-xref-go">on Goal &amp; costs</span></button></> });
+      body: <>Their costs are filled in from your average margin, so profit on those products is a guess. Add their costs in Shopify (“Cost per item”) or here. <button type="button" className="v3-xref" onClick={go('goal', 'costs')}>Products with no cost yet <span className="v3-xref-go">on Goal &amp; costs</span></button></> });
   }
   // 3. cash
   const C = cfg.rows[0] || {}, asOf = C.opening_cash_as_of ? v3Iso10(C.opening_cash_as_of) : null;
@@ -26677,7 +26692,9 @@ function V3DataTrust() {
   const cv = (cov.rows || []).filter(r => r.order_coverage != null), cavg = cv.length ? cv.reduce((a, r) => a + num(r.order_coverage), 0) / cv.length : null;
   const usualG = (() => { const xs = (covM.rows || []).filter(r => num(r.orders) >= 30 && r.ga4_share != null && String(r.month).slice(0, 7) < today.slice(0, 7))
     .map(r => num(r.ga4_share)).sort((a, b) => a - b); return xs.length >= 4 ? xs[Math.floor(xs.length / 2)] : null; })();
-  const ga4Low = cavg != null && (usualG != null ? cavg < usualG - 0.10 : cavg < 0.9);
+  // 18 Nov: only a brand whose Google Analytics has recorded something (Tranquillity has no GA: 0% of orders, every day)
+  const gaSeen = (covM.rows || []).some(r => num(r.ga4_share) > 0) || cv.some(r => num(r.order_coverage) > 0);
+  const ga4Low = gaSeen && cavg != null && (usualG != null ? cavg < usualG - 0.10 : cavg < 0.9);
   const ga4Usual = usualG != null ? <>, against your usual {fmtPctN(usualG)}</> : null;
   if (g4) items.push({ k: 'ga4', short: 'Google Analytics is still recovering', head: 'Google Analytics is recovering, so comparisons of visits and of the share of visitors who buy are paused until ' + v3Day(g4.comparisons_clean_from, true) + '.',
     body: <>It wasn’t recording properly from {v3Day(g4.broke_on)} to {v3Day(g4.fixed_on, true)}. Any comparison that reaches back into those weeks would read the repair as growth. Your Shopify orders are used meanwhile.{ga4Low ? <> It also sees only {fmtPctN(cavg)} of your orders now{ga4Usual}. Check that it records a purchase on every order, including express checkouts.</> : null}</> });
@@ -26703,7 +26720,7 @@ function V3DataTrust() {
   // 6. products without a SKU
   const noSku = new Set((stock.rows || []).filter(r => String(r.sku || '').startsWith('v:') && num(r.weekly_velocity) > 0).map(r => String(r.product_title || '').toLowerCase())).size;
   if (noSku > 0) items.push({ k: 'sku', short: fmtCount(noSku) + ' selling products have no product code', head: fmtCount(noSku) + ' products that sell have no product code (SKU) in Shopify.',
-    body: <>Greta tracks them by Shopify’s own id, so stock and profit include them, but a supplier order can’t carry a product code for them. Add one to each in Shopify. <button type="button" className="v3-xref" onClick={go('stock')}>Which products <span className="v3-xref-go">on Stock &amp; orders</span></button></> });
+    body: <>They are tracked by Shopify’s own id, so stock and profit include them, but a supplier order can’t carry a product code for them. Add one to each in Shopify. <button type="button" className="v3-xref" onClick={go('stock')}>Which products <span className="v3-xref-go">on Stock &amp; orders</span></button></> });
 
   const shortList = items.slice(0, 3).map(i => i.short);
   const jobLate = !!(jh.rows && jh.rows.length);
@@ -26713,7 +26730,9 @@ function V3DataTrust() {
   const feeds = FR && FR.stale && FR.said ? (FR.core_stale ? 'Your data is out of date (see the note at the top).' : 'Some of your data is out of date (see the note at the top).')
     : jobLate ? 'Your data is arriving, but a refresh that works it out has failed (see the note above), so some figures may lag.'
     : 'Your feeds are current.';
-  const verdict = !items.length ? (jobLate ? feeds + ' Nothing else is reading wrong.' : 'Your feeds are current and nothing is reading wrong.')
+  // 18 Nov: with nothing listed the verdict still says what the banner says (testio: "Your feeds are current and
+  // nothing is reading wrong" beside "Stale, last order 136 days ago")
+  const verdict = !items.length ? (jobLate || (FR && FR.stale && FR.said) ? feeds + ' Nothing else is reading wrong.' : 'Your feeds are current and nothing is reading wrong.')
     : feeds + ' ' + (items.length === 1 ? 'One thing makes' : v3Sentence(['', 'one', 'two', 'three', 'four', 'five', 'six'][items.length] || String(items.length)) + ' things make') + ' numbers read wrong: ' + shortList.join('; ') + (items.length > 3 ? '; and ' + (items.length - 3) + ' more below' : '') + '.';
   return (<div className="v3-page-stack"><section>
     <div className="v3-kick">Data trust</div>
@@ -27830,7 +27849,7 @@ function v3ModelWeek(W, T, cmr, info) {
     { amt: cmr * sO, k: v3UpDown(T.orders, W.orders, 'More orders', 'Fewer orders'), sub: fmtCount(Math.round(T.orders)) + ' to ' + fmtCount(W.orders),
       cause: <>there were {v3UpDown(T.orders, W.orders, 'more', 'fewer')} orders than in a typical week ({fmtCount(Math.round(T.orders))} to {fmtCount(W.orders)}){info.sale ? ', with a sale on' : ''}</>,
       against: <>{v3UpDown(T.orders, W.orders, 'More', 'Fewer')} orders ({fmtCount(Math.round(T.orders))} to {fmtCount(W.orders)})</> },
-    { amt: cmr * sA, k: v3UpDown(aT, aW, 'Bigger orders', 'Smaller orders'), sub: fmtMoney(aT, 2) + ' to ' + fmtMoney(aW, 2) + ' an order',
+    { amt: cmr * sA, k: v3UpDown(aT, aW, 'Bigger orders', 'Smaller orders'), sub: fmtMoney(aT, 2) + ' to ' + fmtMoney(aW, 2) + ' an order after refunds',
       cause: <>orders were {v3UpDown(aT, aW, 'bigger', 'smaller')} ({fmtMoney(aT, 2)} to {fmtMoney(aW, 2)})</>,
       against: <>{v3UpDown(aT, aW, 'Bigger', 'Smaller')} orders ({fmtMoney(aT, 2)} to {fmtMoney(aW, 2)})</> },
   ] : [
@@ -27853,7 +27872,7 @@ function v3ModelWeek(W, T, cmr, info) {
     closing: <> Each £1 of sales keeps about {Math.round(cmr * 100)}p after products and delivery, so each £100 of sales is worth about {v3About(cmr * 100)} here.</>,
     rows: [
       ['Sales', T.sales, W.sales, v => fmtMoney(v), 'higher'],
-      ...(okO ? [['Orders', T.orders, W.orders, v => fmtCount(Math.round(v)), 'higher'], ['Average order', aT, aW, v => fmtMoney(v, 2), 'higher']] : []),
+      ...(okO ? [['Orders', T.orders, W.orders, v => fmtCount(Math.round(v)), 'higher'], ['Sales per order after refunds', aT, aW, v => fmtMoney(v, 2), 'higher']] : []),
       ['Ad spend', T.spend, W.spend, v => fmtMoney(v), 'lower'],
       ['Profit after ads', T.kept, W.kept, sgn, 'higher'],
     ],
@@ -28111,7 +28130,8 @@ function V3AnatomyInputs() {
     done(r, 'Saved. They are used the next time your figures are worked out.');
   };
   return (<section className="v3-sec">
-    <h2 className="v3-sec-title">Figures needed <span className="v3-muted">{needs.length ? fmtCount(needs.length) + (needs.length === 1 ? ' figure' : ' figures') : 'all filled in'}</span></h2>
+    {/* 18 Nov: "all filled in" only once some part is live; an empty brand has no part asking yet (testio, 0 of 13 ready) */}
+    <h2 className="v3-sec-title">Figures needed <span className="v3-muted">{needs.length ? fmtCount(needs.length) + (needs.length === 1 ? ' figure' : ' figures') : C.some(r => (r.measures || []).some(m => m.health === 'live')) ? 'all filled in' : 'none asked for until your data arrives'}</span></h2>
     <p className="v3-note v3-measure">Some things only you know. Each one below closes a gap above.</p>
     {msg && <p className="micro v3-measure">{msg}</p>}
 
@@ -28477,7 +28497,7 @@ function v3ModelLastYear(a, _b, ctx) {
     rows: [
       ['Sales', sl, s, v => fmtMoney(v), 'higher'],
       ['Orders', ol, o, v => fmtCount(v), 'higher'],
-      ['Average order', ol > 0 ? sl / ol : null, o > 0 ? s / o : null, v => fmtMoney(v, 2), 'higher'],
+      ['Sales per order after refunds', ol > 0 ? sl / ol : null, o > 0 ? s / o : null, v => fmtMoney(v, 2), 'higher'],
       ['New customers', nl, n, v => fmtCount(v), 'higher'],
       ['Ad spend', adl, ad, v => fmtMoney(v), null],
       ['Sales from each £1 of ads', adl > 0 ? sl / adl : null, ad > 0 ? s / ad : null, v => fmtMoney(v, 2), 'higher'],
