@@ -27091,7 +27091,10 @@ function v3BuildSigns(S, hist, opts) {
   // without this the panels and the verdict above them disagreed by a few pounds for the rest of the day.
   const HP = HP0 && HP0.length && num(L.sales) > 0 && L.ads != null ? HP0.slice(0, -1).concat([(() => {
     const p = HP0[HP0.length - 1], sl = num(p.sales_ly), al = num(p.ads_ly), sv = num(L.sales), av = num(L.ads);
-    return Object.assign({}, p, { sales: sv, sales_net: sv, ads: av, return: av > 0 ? Math.round(sv / av * 100) / 100 : p.return,
+    // 1293: and the headline's orders (refunded-in-full ones in, as the history now counts them), so sales per order
+    // divides the headline's sales by the headline's count within the hour too
+    const ov = num(L.orders) > 0 ? num(L.orders) : p.orders;
+    return Object.assign({}, p, { sales: sv, sales_net: sv, ads: av, orders: ov, return: av > 0 ? Math.round(sv / av * 100) / 100 : p.return,
       vs_ly: sl > 0 ? Math.round((sv / sl - 1) * 1000) / 1000 : p.vs_ly, ads_vs_ly: al > 0 ? Math.round(av / al * 100) / 100 : p.ads_vs_ly });
   })()]) : HP0;
   const ser = k => HP ? HP.map(p => ({ d: String(p.d), v: p[k] == null ? null : Number(p[k]) })) : null;
