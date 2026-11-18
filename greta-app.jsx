@@ -22225,7 +22225,9 @@ function V3Stock() {
           <td>{fmtCount(r.units)} {Number(r.units) === 1 ? 'unit' : 'units'}</td>
           {anyPeak && <td className="v3-muted">{r.forPeak > 0 ? fmtCount(r.forPeak) : FMT_NONE}</td>}
           <td className="v3-muted">{r.cost != null ? fmtMoney(r.cost) : FMT_NONE}</td>
-          <td>{r.risk > 0 ? fmtMoney(r.risk) : FMT_NONE}</td>
+          {/* 18 Nov (night eval): a forecast, so round pounds, as the strip above ("Waiting costs £31k") and the Why panel
+              say it; the column read "£30,615 / £748 / £397" on Halden's first screen */}
+          <td>{r.risk > 0 ? v3About(r.risk) : FMT_NONE}</td>
         </tr>))}</tbody>
       </table>
       <div className="v3-btn-row">
@@ -27891,8 +27893,9 @@ function v3ModelStock(order, lead, land, sooner) {
   const perDayA = out.reduce((t, r) => t + r.perDay, 0), perDayB = soon.reduce((t, r) => t + r.perDay, 0);
   const avgDays = soon.length ? Math.round(soon.reduce((t, r) => t + (r.days || 0), 0) / soon.length) : null;
   return {
-    title: 'Why ' + fmtMoney(tot) + ' of profit is lost before the order lands',
-    from: 0, to: tot, better: 'lower', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    // 18 Nov (night eval): the loss before the order lands is a forecast; its figures are round, as the opening says them
+    title: 'Why ' + v3About(tot) + ' of profit is lost before the order lands',
+    from: 0, to: tot, better: 'lower', fmtV: v => v3About(v), fmtAmt: v => v3About(Math.abs(v)),
     startK: 'If the order were here today', endK: 'Lost before it lands', subA: ' ', subB: 'arrives ' + v3Day(land, true),
     bridgeCap: 'What runs short, and how much it costs', noChange: true, tableTitle: 'The two groups', of: 'that', endTone: 'loss',
     colA: 'Already out', colB: 'Run out before it lands',
@@ -27910,7 +27913,7 @@ function v3ModelStock(order, lead, land, sooner) {
     rows: [
       ['Products', out.length, soon.length, v => fmtCount(v), null],
       ['Profit lost a day, once out', perDayA, perDayB, v => fmtMoney(v), null],
-      ['Profit lost before the order lands', A, B, v => fmtMoney(v), null],
+      ['Profit lost before the order lands', A, B, v => v3About(v), null],
     ],
     note: 'From the stock list on this page (the same list the board orders from): each product’s profit lost on the days it has nothing to sell before an order placed today could arrive. Shopify keeps only today’s stock; a copy has been kept each night since 9 October, so in a few weeks this can say which products ran out, which were restocked and which are still out.',
   };
