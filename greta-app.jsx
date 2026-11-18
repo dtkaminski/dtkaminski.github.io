@@ -24885,6 +24885,7 @@ function useV3Peak(leadDays) {
     // stops a week out, when peak stock should be in (fn_peak_stock_deadline).
     .eq('brand_id', b).eq('row_group', 'seasonality').gte('start_date', v3IsoAdd(today, 1)).lte('start_date', v3IsoAdd(today, 120)).limit(200));
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
+  const stP = useV3Rows('brand-state', V3_STATE_Q);   // the peak's pace, as the plan and the Calendar give it
   // product status, so last year's sellers that are archived read "no longer sold", not "missing"
   const prods = useV3Rows('stock-prod-status', (sb, b) => sb.from('tenant_shopify_products').select('title,status').eq('brand_id', b).limit(3000));
   const peak = React.useMemo(() => {
@@ -24899,8 +24900,14 @@ function useV3Peak(leadDays) {
       const daily = []; let ws = 0, wn = 0;
       for (let i = 0; i < days; i++) { const v = by[v3IsoAdd(lyS, i)]; daily.push({ d: v3IsoAdd(e.start, i), s: v || 0 }); if (v != null) { ws += v; wn++; } }
       const base = []; for (let i = 1; i <= 56; i++) { const v = by[v3IsoAdd(lyS, -i)]; if (v != null) base.push(v); }
-      if (wn < days * 0.8 || base.length < 28) continue;
-      const normal = v3Med(base), ratio = normal > 0 ? (ws / wn) / normal : null;
+      // 18 Nov: the pace is brand state's when it names this peak (fn_brand_next_peak / fn_brand_current_peak), as the plan
+      // and the Calendar say it. The ladder here starts 400 days back and the baseline is the 56 days before last year's
+      // peak, up to 420 back, so for a peak weeks away the median ran on fewer days: frkl 7.4x here against 7.6x there.
+      const S0 = stP.rows && stP.rows[0];
+      const sp = S0 ? [S0.peak_now, S0.peak].find(x => x && x.title === e.title && String(x.start || '').slice(0, 10) === e.start) : null;
+      const srvRatio = sp && Number(sp.ratio) > 0 ? Number(sp.ratio) : null;
+      if (wn < days * 0.8 || (base.length < 28 && srvRatio == null)) continue;
+      const normal = v3Med(base), ratio = srvRatio != null ? srvRatio : normal > 0 ? (ws / wn) / normal : null;
       if (ratio != null && ratio >= 2) {
         let now = 0, ly = 0, n1 = 0, n2 = 0; for (let i = 1; i <= 30; i++) { const a = by[v3IsoAdd(today, -i)], c = by[v3IsoAdd(today, -i - 364)]; if (a != null) { now += a; n1++; } if (c != null) { ly += c; n2++; } }
         const growth = n1 >= 25 && n2 >= 25 && ly > 0 ? Math.max(-0.5, Math.min(1, now / ly - 1)) : null;
@@ -24911,7 +24918,7 @@ function useV3Peak(leadDays) {
       }
     }
     return null;
-  }, [cal.rows, lad.rows, today, leadDays]);
+  }, [cal.rows, lad.rows, stP.rows, today, leadDays]);
   const ly = useV3Rows('stock-peak-ly-' + (peak ? peak.lyS : 'none'), (sb, b) => peak ? sb.from('v_tenant_shopify_lineitems_daily')
     .select('day,product_title,units').eq('brand_id', b).gte('day', peak.lyS).lte('day', peak.lyE).gt('units', 0).limit(5000) : Promise.resolve({ data: [] }));
   return { peak, ly: peak ? ly.rows : [], prods: prods.rows, ready: !!(cal.rows && lad.rows) && (!peak || !!ly.rows) };
