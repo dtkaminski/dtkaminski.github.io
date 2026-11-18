@@ -18458,12 +18458,16 @@ function V3MoveRunway({ peakOn, lead: leadWords }) {
   const landOn = String(rows[0].lands_on).slice(0, 10);
   const pkD = peakOn ? Math.round((v3Ms(peakOn) - v3Ms(new Date().toISOString().slice(0, 10))) / 864e5) : null;
   const pk = pkD != null && pkD > 0 && pkD < span ? pkD : null;
+  // 18 Nov: past the middle the order's label hangs left of its mark, inside the figure ("Order lands 10 Jan" ran 17px
+  // past it on a phone, 10px at 1024, where the track is about 80px). The peak's label then takes the line above.
+  const leadR = (pk != null && pk > lead) || lead / span > 0.5;
+  const stack = pk != null && pk < lead && leadR;
   return (<figure className={'v3-mvviz v3-mvrun' + (leadWords ? ' v3-mvrun-lead' : '')} aria-label="Days of stock left against when an order would land">
     {leadWords ? <>
       <figcaption>Days of stock left</figcaption>
-      <div className="v3-mvrun-row v3-mvrun-head" aria-hidden="true"><span/><span className="v3-mvrun-marks">
-        {pk != null && <em className={pk < lead ? 'r' : ''} style={{ left: (pk / span * 100) + '%' }}>Peak {v3Day(peakOn)}</em>}
-        <em className={pk != null && pk > lead ? 'r' : ''} style={{ left: (lead / span * 100) + '%' }}>Order lands {v3Day(landOn)}</em>
+      <div className="v3-mvrun-row v3-mvrun-head" aria-hidden="true"><span/><span className={'v3-mvrun-marks' + (stack ? ' two' : '')}>
+        {pk != null && <em className={(pk < lead ? 'r' : '') + (stack ? ' up' : '')} style={{ left: (pk / span * 100) + '%' }}>Peak {v3Day(peakOn)}</em>}
+        <em className={leadR ? 'r' : ''} style={{ left: (lead / span * 100) + '%' }}>Order lands {v3Day(landOn)}</em>
       </span><span/></div></>
     : <figcaption>Days of stock left <span>the line is {v3Day(landOn)}, when an order placed today lands</span></figcaption>}
     {rows.map(r => { const d = Number(r.days_left) || 0;
@@ -18944,9 +18948,18 @@ function v3PersonName(p) {
   const e = String((p && p.email) || '');
   return e ? e.split('@')[0].replace(/\./g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'A team member';
 }
+// 18 Nov: a move's deadline is the date peak stock has to be in (fn_peak_stock_deadline, the week before a peak starts)
+// when the peak plan or the stock order carries it, not an order-by date. frkl's peak plan ended "Its order-by date,
+// 13 Nov, has passed" in red, under a plan that runs on the stock on hand.
+function v3IsPeakIn(d, stRows) {
+  const S0 = stRows && stRows[0], dd = String(d || '').slice(0, 10);
+  return !!(S0 && dd) && [S0.peak_now, S0.peak].some(x => x && /^\d{4}-\d\d-\d\d/.test(String(x.start || ''))
+    && v3IsoAdd(String(x.start).slice(0, 10), -7) === dd);
+}
 function V3MoveWho({ ext }) {
   const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
   const team = useV3Rows('team-who', V3_TEAM_Q);
+  const st = useV3Rows('brand-state', V3_STATE_Q);
   const last = React.useRef(null);
   const [edit, setEdit] = React.useState(false);
   const [pick, setPick] = React.useState('');
@@ -18960,14 +18973,17 @@ function V3MoveWho({ ext }) {
   const m = found || last.current;
   if (!m) return null;
   const today = new Date().toISOString().slice(0, 10);
+  const pkIn = v3IsPeakIn(m.deadline, st.rows);
   if (!m.taken_on) {
-    // a move nobody took on is never late; only its own deadline can pass
-    return m.deadline && m.deadline < today ? <p className="v3-mv-late">Its order-by date, {v3Day(m.deadline)}, has passed.</p> : null;
+    // a move nobody took on is never late; only its own deadline can pass. The week-before-the-peak date passing is a
+    // fact, not an alarm: the plan already says the peak runs on the stock there is.
+    return m.deadline && m.deadline < today ? (pkIn ? <p className="v3-mv-past">The date for peak stock to be in, {v3Day(m.deadline)}, has passed.</p>
+      : <p className="v3-mv-late">Its order-by date, {v3Day(m.deadline)}, has passed.</p>) : null;
   }
   const uid = v3Uid(), a = m.assignee;
   const who = !a ? 'Nobody yet' : a.kind === 'agency' ? a.label + ' (agency)' : a.user_id && a.user_id === uid ? 'You' : a.label;
   const late = Number(m.overdue_days) > 0;
-  const why = m.due_from === 'deadline' ? ', the order-by date' : m.due_from === 'week' ? ', a week from taking it on' : '';
+  const why = m.due_from === 'deadline' ? (pkIn ? ', the date for peak stock to be in' : ', the order-by date') : m.due_from === 'week' ? ', a week from taking it on' : '';
   // 1280: a viewer can read a move but cannot mark it done, so a move is not given to one
   const people = (team.rows || []).filter(p => p && p.user_id && p.role !== 'viewer');
   const open = () => {
@@ -19053,7 +19069,10 @@ function V3MorningAlerts() {
   const peak = Pk && Pk.title && (pkUw || (pkIn != null && pkIn >= 0 && pkIn <= 7)) ? Pk : null;
   if (!all.length && !peak) return null;
   const title = ext => { const r = (board.rows || []).find(x => x.external_id === ext); return r ? v3PlainAction(r).title : ext; };
-  const when = (n, iso) => n <= 0 ? 'today' : n === 1 ? 'tomorrow' : 'in ' + n + ' days, on ' + v3Day(iso);
+  // the day and month stay on one line (18 Nov: "20 / Nov." split on a phone)
+  const day = iso => v3Day(iso).replace(/ /g, ' ');
+  const when = (n, iso) => n <= 0 ? 'today' : n === 1 ? 'tomorrow' : 'in ' + n + ' days, on ' + day(iso);
+  const byWhen = (n, iso) => n <= 0 ? 'by today' : n === 1 ? 'by tomorrow' : 'by ' + day(iso) + ', in ' + n + ' days';
   const BM = bm.rows && bm.rows[0];
   const pkPlan = peak && BM && Array.isArray(BM.rows) ? BM.rows.find(r => r.external_id === 'promo-peak-plan') : null;
   // the plan's own row is on Goal ("The plan and ad budget"); on Actions it is a step under the stock order
@@ -19069,7 +19088,8 @@ function V3MorningAlerts() {
     {all.map(a => <li key={a.key} className={'v3-ma-line v3-ma-' + a.kind}>
       {a.kind === 'goal_off' && <><b>Your goal slipped off track overnight.</b> You are now on course {Number(a.forecast) < 0 ? 'to lose ' + v3Gbp(Math.abs(Number(a.forecast))) : 'for ' + v3Gbp(a.forecast)} after ads by {v3Day(a.period_end)}, <span className="v3-res-fig">{v3Gbp(a.gap)}</span> short of your goal.</>}
       {a.kind === 'late' && <><b>{title(a.external_id)}</b> is {a.days === 1 ? 'a day' : a.days + ' days'} late: it was due {v3Day(a.due_on)}{a.assignee && a.assignee.label ? ', with ' + a.assignee.label : ''}.</>}
-      {a.kind === 'deadline' && <><b>{title(a.external_id)}</b>: its order-by date is {when(a.days, a.deadline)}.{a.taken_on ? '' : ' Nobody has taken it on yet.'}</>}
+      {/* a full stop after the title: a plan's title has its own colon ("...as one event: the code, the stock and the offer") */}
+      {a.kind === 'deadline' && <><b>{title(a.external_id)}</b>. {v3IsPeakIn(a.deadline, st.rows) ? 'Peak stock has to be in ' + byWhen(a.days, a.deadline) : 'Its order-by date is ' + when(a.days, a.deadline)}.{a.taken_on ? '' : ' Nobody has taken it on yet.'}</>}
     </li>)}</ul>
   </section>);
 }
@@ -20555,7 +20575,9 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
       </div></div>
     </td>
     <td className="v3-home-area" data-k="Area">{v3CategoryWords(row.category)}</td>
-    <td className="v3-home-worth" data-k="Worth">{gbp > 0 ? <><b>{v3GbpRound(gbp)}{v3Per(row)}</b>{isStock ? <small>protected</small> : row.money_is_sales ? <small>in sales</small> : null}</>
+    {/* a one-off says "once" by the figure and when under it: "£96 once, over the peak" ran 142px under the
+        confidence pill in a 112px cell at 1024 (18 Nov) */}
+    <td className="v3-home-worth" data-k="Worth">{gbp > 0 ? <><b>{v3GbpRound(gbp)}{v3Once(row) ? ' once' : v3Per(row)}</b>{v3Once(row) ? <small>{v3OnceOver(row.money_basis).replace(/^once,\s*/, '')}</small> : null}{isStock ? <small>protected</small> : row.money_is_sales ? <small>in sales</small> : null}</>
       : wide && due ? <><b>{v3Day(due)}</b><small>due</small></> : wide ? <small>No figure</small> : '–'}</td>
     <td className="v3-home-basis" data-k="Confidence">{sure ? <V3Conf state={sure} detail={v3SureWhy(row, sure)}/> : '–'}</td>
     {wide && owners && <td className="v3-home-owner" data-k="Owner">{who && <><b>{who}</b>{bmRow && bmRow.due_on && <small className={late ? 'v3-down' : ''}>{late ? fmtCount(bmRow.overdue_days) + (Number(bmRow.overdue_days) === 1 ? ' day late' : ' days late') : 'Due ' + v3Day(bmRow.due_on)}</small>}</>}</td>}
@@ -22244,33 +22266,61 @@ function V3StockOffer() {
   const L = v3Lead(lq.rows);
   const P = useV3Peak(L.days);
   const figQ = useV3Figures();   // the offer depth (1109)
+  // 1289: the peak plan's own two lists, what to lead with and what to keep out of the ads, so this page and the plan
+  // name the same products. On 18 Nov this page built its own by product and featured "lower case initial charm"
+  // (723 across its letters) while the plan kept its "a / Gold" out of the ads and the order list above said it runs
+  // out in 14 days.
+  const planQ = useV3Rows('peak-plan-lists', (sb, b) => sb.from('actions')
+    .select('peak:metadata->peak,feature:metadata->on_hand_plan->feature,short:metadata->short')
+    .eq('brand_id', b).eq('external_id', 'promo-peak-plan').eq('status', 'open').limit(1));
   const pk = P.peak;
-  if (!pk || !q.rows || !q.rows.length || !P.ready) return null;
+  if (!pk || !q.rows || !q.rows.length || !P.ready || (!planQ.rows && !planQ.err)) return null;
   const pkName = v3PlainWords(pk.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '');
   const todayIso = new Date().toISOString().slice(0, 10);
-  const rows = q.rows, num = v => Number(v) || 0;
+  const rows = q.rows, num = v => Number(v) || 0, keyOf = t => String(t || '').trim().toLowerCase();
   const lead = rows.find(r => r.lead_days != null) ? num(rows.find(r => r.lead_days != null).lead_days) : L.days;
   const land = v3IsoAdd(todayIso, lead);
   if (pk.start <= todayIso || land <= pk.start) return null;   // an order can still land in time: the list above covers it
-  const T = {}; rows.forEach(r => { const t = String(r.product_title || '').trim().toLowerCase(); if (!t || v3IsBundle(t)) return;
+  // the sea order lands after the peak; until the week before it starts, stock can still come sooner (the plan's air step)
+  const afterEnd = land > pk.end, inBy = v3IsoAdd(pk.start, -7), canSooner = inBy >= todayIso;
+  const T = {}; rows.forEach(r => { const t = keyOf(r.product_title); if (!t || v3IsBundle(t)) return;
     const o = T[t] || (T[t] = { title: r.product_title, oh: 0, v: 0 }); o.oh += Math.max(0, num(r.on_hand)); o.v += num(r.weekly_velocity); });
+  const V = {}; rows.forEach(r => { const t = keyOf(r.product_title); if (t) V[t] = (V[t] || 0) + num(r.weekly_velocity); });
   const PU = v3PeakUnits(P.ly, Object.keys(T), P.prods);
-  const items = Object.values(PU).filter(p => !p.title.startsWith('#')).map(p => {
-    const s = T[p.title]; const left = Math.max(0, Math.round(s.oh - s.v / 7 * pk.until));
-    return { title: v3Sentence(s.title), ly: p.total, left, onOrder: s.v > 0, renamed: p.from !== p.title ? v3Sentence(p.from) : null };
-  }).filter(x => x.ly >= 5);
-  const plenty = items.filter(x => x.left >= x.ly * 1.5).sort((a, b) => b.ly - a.ly).slice(0, 6);
-  const short = items.filter(x => x.left < x.ly).sort((a, b) => b.ly - a.ly).slice(0, 6);
+  const M = planQ.rows && planQ.rows[0], mp = M && M.peak;
+  const fromPlan = !!(mp && mp.title === pk.title && String(mp.start || '').slice(0, 10) === pk.start
+    && Array.isArray(M.feature) && Array.isArray(M.short) && (M.feature.length || M.short.length));
+  let plenty, short;
+  if (fromPlan) {
+    // the plan's figures as its steps say them: stock at the start against last year's peak units; a short one's
+    // stock is last year's units less what it is short by ("stock for about 15 of the 68 it sold last year")
+    plenty = M.feature.map(f => ({ title: v3Sentence(f.title), ly: num(f.ly_units), left: Math.max(0, Math.round(num(f.at_start))) }));
+    short = M.short.map(s => ({ title: v3Sentence(s.title), ly: num(s.ly_units), left: Math.max(0, Math.round(num(s.ly_units) - Math.max(0, num(s.short)))),
+      onOrder: (V[keyOf(s.product || s.title)] || 0) > 0 }));
+  } else {
+    const items = Object.values(PU).filter(p => !p.title.startsWith('#')).map(p => {
+      const s = T[p.title]; const left = Math.max(0, Math.round(s.oh - s.v / 7 * pk.until));
+      return { key: p.title, title: v3Sentence(s.title), ly: p.total, left, onOrder: s.v > 0, renamed: p.from !== p.title ? v3Sentence(p.from) : null };
+    }).filter(x => x.ly >= 5);
+    // never lead with a product the order list says runs out before its restock lands
+    const rob = new Set(rows.filter(r => r.runs_out_before_restock).map(r => keyOf(r.product_title)));
+    plenty = items.filter(x => x.left >= x.ly * 1.5 && !rob.has(x.key)).sort((a, b) => b.ly - a.ly).slice(0, 6);
+    short = items.filter(x => x.left < x.ly).sort((a, b) => b.ly - a.ly).slice(0, 6);
+  }
   const gone = Object.values(PU).filter(p => p.title.startsWith('#archived:') && p.total >= 5).sort((a, b) => b.total - a.total);
   if (!plenty.length && !short.length) return null;
-  const tbl = (list, last) => (<table className="v3-rw">
-    <thead><tr><th className="t-text">Product</th><th>Sold in last year’s peak</th><th>Left when it starts</th>{last && <th className="t-text">Restock arrives</th>}</tr></thead>
-    <tbody>{list.map(x => (<tr key={x.title}>
-      <td className="t-text v3-rw-name">{x.title}{x.renamed ? <span className="v3-sub">, was “{x.renamed}”</span> : null}</td>
+  // on a phone the restock date sits under the name, so the name keeps whole words (18 Nov: "bracele/t" in a 61px
+  // column beside a 170px "Not on order, out for weeks")
+  const tbl = (list, last) => (<table className="v3-rw v3-pk-tbl">
+    <thead><tr><th className="t-text">Product</th><th>Sold in last year’s peak</th><th>Left when it starts</th>{last && <th className="t-text v3-pk-rs">Restock arrives</th>}</tr></thead>
+    <tbody>{list.map(x => { const rs = x.onOrder ? v3Day(land) : 'Not on order, out for weeks';
+      return (<tr key={x.title}>
+      <td className="t-text v3-rw-name">{x.title}{x.renamed ? <span className="v3-pk-was">{' (was “' + x.renamed + '”)'}</span> : null}
+        {last && <span className="v3-pk-rs-in">{x.onOrder ? 'Restock arrives ' + rs.replace(/ /g, ' ') : rs}</span>}</td>
       <td>{fmtCount(x.ly)}</td>
       <td className={x.left < x.ly ? 'v3-down' : ''}>{fmtCount(x.left)}</td>
-      {last && <td className="t-text v3-muted">{x.onOrder ? v3Day(land) : 'Not on order, out for weeks'}</td>}
-    </tr>))}</tbody>
+      {last && <td className="t-text v3-muted v3-pk-rs">{rs}</td>}
+    </tr>); })}</tbody>
   </table>);
   return (<div className="v3-page-stack"><section className="v3-sec">
     <div className="v3-kick">Your next busy period, {pkName}, {v3Day(pk.start)} – {v3Day(pk.end, true)}</div>
@@ -22285,11 +22335,12 @@ function V3StockOffer() {
       return <p className="v3-note v3-measure"><b>How deep to go.</b> After product and order costs you keep about {v3About(k0)} of every £100 you sell at full price.
         {' '}At 20% off you keep {fmtMoney(k20)}{half !== 20 ? <>; at {half}% off, {fmtMoney(kCap)}, about half</> : <>, about half</>}; at 45% off, {fmtMoney(k45)}. Codes also go to people who would have bought anyway, so keep the offer at or under {half}% off and put it on what you have plenty of, below.
         {' '}<V3Conf state="likely" detail="Your margin after product and order costs over the last 30 days, applied to full-price sales. It leaves out the extra orders a deeper offer brings, which have to make up the difference."/></p>; })()}
-    <p className="v3-note v3-measure">The same {fmtCount(pk.days)} days last year sold {fmtMoney(pk.lySales)}, {v3Dp1Num(Number(pk.ratio))}× your normal pace. The order above arrives on {v3Day(land)}, after it starts, so until then you can only sell what is in stock. Featuring what you have plenty of sells stock you have already paid for. Advertising what will run short sells it out early, and then you pay for clicks on a sold-out page.
+    <p className="v3-note v3-measure">The same {fmtCount(pk.days)} days last year sold {fmtMoney(pk.lySales)}, {v3Dp1Num(Number(pk.ratio))}× your normal pace. The order above arrives on {v3Day(land)}, {afterEnd ? (canSooner ? 'after it ends, so the peak runs on what is in stock and what a supplier can send by ' + v3Day(inBy) : 'after it ends, so the whole peak runs on what is in stock') : 'after it starts, so until then you can only sell what is in stock'}. Featuring what you have plenty of sells stock you have already paid for. Advertising what will run short sells it out early, and then you pay for clicks on a sold-out page.
       {' '}<V3Conf state="probably" detail="Based on units sold on the same days last year, at last year’s prices and offers. A bigger or smaller offer this year changes demand to match. Stock left assumes today’s pace until the peak starts."/></p>
     {plenty.length > 0 && <><h2 className="v3-sec-title">Feature these in the offer</h2>{tbl(plenty, false)}</>}
-    {short.length > 0 && <><h2 className="v3-sec-title">Keep these out of your ads until the order arrives</h2>{tbl(short, true)}</>}
+    {short.length > 0 && <><h2 className="v3-sec-title">{afterEnd ? 'Keep these out of your ads once they run low' : 'Keep these out of your ads until the order arrives'}</h2>{tbl(short, true)}</>}
     {gone.length > 0 && <p className="micro muted v3-measure">{gone.length === 1 ? 'One of last year’s peak sellers is' : fmtCount(gone.length) + ' of last year’s peak sellers are'} no longer sold: {gone.slice(0, 4).map(p => v3Sentence(p.from)).join(', ')}{gone.length > 4 ? ' and others' : ''}.</p>}
+    {fromPlan && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', null, 'promo-peak-plan')}>The whole peak plan <span className="v3-xref-go">on Goal</span></button>}
     <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan the offer <span className="v3-xref-go">on Calendar</span></button>
   </section></div>);
 }

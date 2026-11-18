@@ -674,6 +674,16 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   .v3-rw-cell { min-width: 0; }
   .v3-main table.v3-rw { display: block; overflow-x: auto; }
 }
+/* The peak tables on Stock & orders (18 Nov). A renamed product's old name joins the last word of the new one, so no
+   line starts with it. On a phone the restock date moves under the name and the name keeps whole words: it broke
+   "bracele/t" in a 61px column beside a 170px "Not on order, out for weeks". */
+.v3-pk-was { color: var(--color-muted); }
+.v3-pk-rs-in { display: none; }
+@media (max-width: 640px) {
+  .v3-main table.v3-rw.v3-pk-tbl .v3-pk-rs { display: none; }
+  .v3-main table.v3-rw.v3-pk-tbl td.v3-rw-name { overflow-wrap: break-word; }
+  .v3-pk-rs-in { display: block; margin-top: var(--space-1); font-size: var(--text-xs); color: var(--color-muted); }
+}
 
 /* ── Calendar (today-calendar.build.js) on the kit ───────────────────────────
    The bundle injects its own <style> after this sheet, so every rule here is scoped under
@@ -1398,6 +1408,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-mv-due { font-family: var(--font-mono); color: var(--color-ink); }
 .v3-mv-due.late, .v3-mv-late { color: var(--color-danger); }
 .v3-mv-late { margin: 0; font-size: var(--text-sm); }
+.v3-mv-past { margin: 0; font-size: var(--text-sm); color: var(--color-muted); }
 .v3-mv-decide .v3-mv-said { margin-left: 0; }   /* the decide block is already indented */
 /* 11 Nov: the decision named where the block sits apart from its row (the Why panel), and where it stands */
 .v3-mv-name { margin: 0; font-size: var(--text-base); font-weight: var(--weight-semi); color: var(--color-ink); }
@@ -1734,6 +1745,8 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-mvrun-marks { position: relative; display: block; height: var(--space-5); }
 .v3-mvrun-marks em { position: absolute; bottom: 0; padding-left: var(--space-1); white-space: nowrap; font-style: normal; font-size: var(--text-xs); color: var(--color-muted); }
 .v3-mvrun-marks em.r { transform: translateX(-100%); padding-left: 0; padding-right: var(--space-1); }
+.v3-mvrun-marks.two { height: calc(var(--space-5) * 2); }
+.v3-mvrun-marks em.up { bottom: var(--space-5); }
 .v3-mvrun-lead .v3-mvrun-row { grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) 3.5rem; }
 .v3-sowhat { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2) var(--space-6); margin: var(--space-5) 0 var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-line); font-size: var(--text-sm); color: var(--color-secondary); }
 .v3-sowhat .v3-xref { margin: 0; padding: 0; border: 0; width: auto; white-space: nowrap; }
@@ -2048,7 +2061,7 @@ button.v3-home-tile:hover, button.v3-home-tile.open { background: var(--color-pa
 .v3-home-area { width: var(--size-home-area); white-space: nowrap; color: var(--color-muted); }
 .v3-home-worth { width: var(--size-home-worth); text-align: right; white-space: nowrap; font-family: var(--font-figure); }
 .v3-home-worth b { font-weight: var(--weight-medium); display: block; }
-.v3-home-worth small { display: block; font-size: var(--text-xs); color: var(--color-faint); font-family: var(--font-sans); }
+.v3-home-worth small { display: block; font-size: var(--text-xs); color: var(--color-faint); font-family: var(--font-sans); white-space: normal; }
 .v3-home-basis { width: var(--size-home-basis); }
 .v3-home-status { width: var(--size-home-status); }
 .v3-home-open { width: var(--size-home-open); text-align: right; white-space: nowrap; }
