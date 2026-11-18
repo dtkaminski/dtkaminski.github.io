@@ -104,6 +104,9 @@
       .select('month,spend,cac,new_customers,cm_per_order,cac_above_contribution,recency_rank')
       .eq('brand_id', b).order('month', { ascending: true }), 10000);
     if (sp && sp.data) window.FRKL_PLAN.spendCurvePoints = sp.data || [];
+    // 18 Nov: says whether the read came back, so the page can tell an empty answer (no ad spend) from a failed read;
+    // the array starts as [] and cannot say it (Halden, read failed: "Charts show once there are four months of ad spend")
+    window.FRKL_PLAN.spendCurvePointsRead = sp && sp.data ? 'ok' : 'failed';
     ping();
     var cm = await withTimeout(s.from('vw_channel_revenue_mix').select('window_label,channel,orders,net_revenue,aov,new_orders,returning_orders,new_revenue,returning_revenue,orders_with_discount,pct_of_revenue').eq('brand_id', b), 10000);
     if (cm && cm.data) window.FRKL_PLAN.channelMix = cm.data || [];

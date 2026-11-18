@@ -21978,10 +21978,10 @@ function V3Growth() {
               <R.Bar dataKey="spend" fill={PAL.ads} isAnimationActive={false}/>
             </R.BarChart>
           </R.ResponsiveContainer></figure>
-      </div> : waiting ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
-        : <p className="v3-panel-note">{pts.length || Array.isArray(P.spendCurvePoints)
-            // 18 Nov: the read came back (greta-plan-data sets the array, empty for a shop with no ad spend); only a
-            // missing array is a failed read. It said "did not load" for every shop without ads (Tranquillity, testio).
+      </div> : waiting && !P.spendCurvePointsRead ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
+        : <p className="v3-panel-note">{pts.length || P.spendCurvePointsRead === 'ok'
+            // 18 Nov: an empty answer (a shop with no ad spend: Tranquillity, testio) is not a failed read; the loader says
+            // which (spendCurvePointsRead). Testing the array was always true: it starts as [].
             ? 'Charts show once there are four months of ad spend.' : 'Monthly figures did not load. Refresh the page, or check back once there are four months of ad spend.'}</p>}
     </section>
 
