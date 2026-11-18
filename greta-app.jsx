@@ -8990,13 +8990,23 @@ async function v3AskFacts(question) {
     f.costs_and_settings.what_reads_wrong = wrong;
   }
   const evs = cal || [];
-  const peak = evs.filter(e => e.row_group === 'seasonality' && e.status !== 'skipped' && String(e.start_date) >= v3IsoAdd(today, 7)).sort((x, y) => (x.start_date < y.start_date ? -1 : 1))[0];
+  // 1288: the peak the brand state names comes first (peak_now while one runs, then peak), so Ask names the same
+  // peak as Home, Goal and Stock & orders. The calendar's pick started 7 days out: on 18 Nov, two days before
+  // frkl's Black Friday to Cyber Monday, Ask's next peak was the one after it, with Black Friday's codes attached.
+  const ST = r0(stateR) && r0(stateR).state;
+  const sPk = ST ? [ST.peak_now, ST.peak].find(x => x && x.title && /^\d{4}-\d{2}-\d{2}/.test(String(x.start || ''))
+    && String(x.end || x.start).slice(0, 10) >= today) : null;
+  const peak = sPk ? { title: sPk.title, start_date: String(sPk.start).slice(0, 10), end_date: sPk.end ? String(sPk.end).slice(0, 10) : null }
+    : evs.filter(e => e.row_group === 'seasonality' && e.status !== 'skipped' && String(e.start_date) >= v3IsoAdd(today, 1)).sort((x, y) => (x.start_date < y.start_date ? -1 : 1))[0];
   if (peak) {
     const s = String(peak.start_date).slice(0, 10), e = String(peak.end_date || peak.start_date).slice(0, 10);
     const ov = x => String(x.start_date).slice(0, 10) <= e && String(x.end_date || x.start_date).slice(0, 10) >= s;
-    // not a registered figure: the calendar's next seasonal window, which can be another peak than the state's (peak_ly_sales)
-    let ly = null; if (lad) { const lyS = v3IsoAdd(s, -364), lyE = v3IsoAdd(e, -364); ly = R(lad.filter(r => { const k = String(r.day).slice(0, 10); return k >= lyS && k <= lyE; }).reduce((a, r) => a + (Number(r.net_sales) || 0), 0)); }
-    f.next_peak = { name: peak.title, from: s, to: e, same_days_last_year_sales: ly,
+    // the state's figure (peak_ly_sales, the Home tile's "Same days last year") when it names this peak; the
+    // calendar's own window otherwise, summed from the ladder (a peak from tomorrow on is inside its 400 days)
+    let ly = sPk && Number(sPk.ly_sales) > 0 ? R(Number(sPk.ly_sales)) : null;
+    if (ly == null && lad) { const lyS = v3IsoAdd(s, -364), lyE = v3IsoAdd(e, -364); ly = R(lad.filter(r => { const k = String(r.day).slice(0, 10); return k >= lyS && k <= lyE; }).reduce((a, r) => a + (Number(r.net_sales) || 0), 0)); }
+    f.next_peak = { name: peak.title, from: s, to: e, same_days_last_year_sales: ly, under_way: s <= today,
+      times_a_normal_pace_last_year: sPk && Number(sPk.ratio) > 0 ? Math.round(Number(sPk.ratio) * 10) / 10 : null,
       promotions_planned: evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped' && ov(x)).map(x => x.title),
       emails_planned: evs.filter(x => x.channel === 'email' && x.status !== 'skipped' && ov(x)).length,
       // peak_stock_deadline (1080/1065) when it is this peak's; the order goes in a lead time before it
@@ -9082,9 +9092,12 @@ async function v3AskFacts(question) {
         short_of_stock: !!pf.stock_constrained }; });
     f._products_note = 'The ' + f._products.length + ' products that sold most in the last 12 months (the list holds ' + Math.round(tot12) + ' of sales between them).';
   }
-  if (f.next_peak && r0(stateR) && r0(stateR).state && r0(stateR).state.peak && Array.isArray(r0(stateR).state.peak.top_codes))
+  // last year's codes for this peak only (1288: they were attached to whichever peak the calendar picked)
+  const pkCodes = f.next_peak && ST ? [ST.peak_now, ST.peak].find(x => x && x.title === f.next_peak.name
+    && String(x.start || '').slice(0, 10) === f.next_peak.from && Array.isArray(x.top_codes)) : null;
+  if (pkCodes)
     f.next_peak.discount_codes_used_at_last_peak = { note: 'Discount codes (a creator or a promotion), not products.',
-      codes: r0(stateR).state.peak.top_codes.map(c => ({ code: c.code, orders: c.orders })) };
+      codes: pkCodes.top_codes.map(c => ({ code: c.code, orders: c.orders })) };
   if (Array.isArray(flowsR)) f._flows = flowsR.filter(x => Number(x.recipients_30d) > 0 || String(x.status).toLowerCase() !== 'live')
     .map(x => ({ flow: x.name, live: String(x.status).toLowerCase() === 'live', people_30d: Number(x.recipients_30d) || 0,
       sales_30d: Math.round(Number(x.attributed_revenue_30d) || 0),
