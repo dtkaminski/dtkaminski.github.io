@@ -9594,7 +9594,8 @@ function buildAskContext(facts, question, budget){
   const stockRow = r => { const o = soBy[soKey(r.product_title)], fp = o ? num(o.weekly_pace_full_price) : null;
     return { product: r.product_title, status: r.stock_status, on_hand: num(r.on_hand),
       weekly_pace: fp != null ? fp : num(r.weekly_velocity), weekly_pace_incl_sale_weeks: o ? num(r.weekly_velocity) : null,
-      days_left: fp > 0 ? Math.round(Math.max(0, num(r.on_hand) || 0) / fp * 7) : num(r.projected_days_to_stockout),
+      // 1303: one run-out date, the one Stock & orders shows (every unit sold, the season ahead), not the full-price pace
+      days_left: num(r.projected_days_to_stockout),
       order_units: o ? num(o.units) : num(r.suggested_order_units), on_the_boards_order: o ? true : null, order_by: r.reorder_by_date || null,
       lost_before_lands: o ? num(o.cm_at_risk) : (r.cm_at_risk_before_resupply == null ? null : Math.round(Number(r.cm_at_risk_before_resupply))),
       unit_cost: r.unit_cost == null ? null : Math.round(Number(r.unit_cost) * 100) / 100 }; };
@@ -22117,6 +22118,10 @@ function V3Stock() {
   // the peak's name as the list names it; the calendar's when the list has none
   const pkName = SM.peak && SM.peak.title ? v3PlainWords(SM.peak.title) : pk ? v3PlainWords(pk.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '') : 'the peak';
   const REASON = { runs_out: 'Runs out before a restock lands', peak_top_up: 'Short for the peak', both: 'Both: runs out first, and short for the peak' };
+  // 1303: the list takes a product that runs out up to a week after a restock would land; when its days left pass
+  // the lead time, "before a restock lands" is not true, so the reason says the week
+  const REASON_WEEK = { runs_out: 'Runs out within a week of a restock landing', both: 'Both: runs out within a week of a restock landing, and short for the peak' };
+  const reasonOf = r => (REASON_WEEK[r.reason] && r.days != null && r.days >= num(r.lead_days || lead)) ? REASON_WEEK[r.reason] : REASON[r.reason] || '';
   // 9 Nov eval: an order placed today that lands after the peak ends cannot sell in it. The board's stock action
   // (fn_emit_stock_actions, 0959) then orders the restock only and names the peak's units as a separate step "only
   // if a supplier can deliver them by" the one peak deadline; this page added them into one total (3,539 against
@@ -22235,7 +22240,7 @@ function V3Stock() {
         <thead><tr><th className="t-text">Product</th><th className="t-text">Why</th><th className="t-text v3-rw-trackh">Stock left</th><th>Order</th>{anyPeak && <th>{afterPk && pkBy ? 'Peak, if by ' + v3Day(pkBy) : 'For the peak'}</th>}<th>Cost</th><th>Profit lost before it arrives</th></tr></thead>
         <tbody>{shown.map(r => (<tr key={r.sku}>
           <td className="t-text v3-rw-name" title={r.noSku ? 'No product code (SKU) in Shopify' : r.sku}>{nameOf(r)}</td>
-          <td className="t-text v3-muted">{r.pre ? 'On pre-order' + (r.owed > 0 ? ': ' + fmtCount(r.owed) + ' already bought' : '') : REASON[r.reason] || ''}</td>
+          <td className="t-text v3-muted">{r.pre ? 'On pre-order' + (r.owed > 0 ? ': ' + fmtCount(r.owed) + ' already bought' : '') : reasonOf(r)}</td>
           <td className="t-text v3-rw-trackc"><div className="v3-rw-cell">
             <span className="v3-rw-track" role="img" aria-label={(r.pre ? 'On pre-order, still selling' : r.days ? r.days + ' days of stock left' : 'Out of stock') + (r.gap ? ', ' + r.gap + ' days with nothing to sell' : '')}>
               {r.days > 0 && <i className="v3-rw-bar" style={{ width: (Math.min(r.days, span) / span * 100) + '%' }}/>}
