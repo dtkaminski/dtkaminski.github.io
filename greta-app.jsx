@@ -28700,12 +28700,15 @@ function v3MarginAt(weeks, m, lastD) {
   if (!(base > 0)) return null;
   return d => { if (String(d) === String(lastD)) return m; const r = raw(d); return r > 0 ? m * r / base : m; };
 }
+const v3SalesNet = p => Number(p.sales_net != null ? p.sales_net : p.sales);
 function v3ModelProfit(a, b, ctx) {
   const m = ctx.m, O = ctx.o || 0, mOf = p => (ctx.mAt ? ctx.mAt(p.d) : m);
   // 19 Nov eval: the ratio is the headline's (profit after ads + ads) / sales, so other marketing is already off it.
   // Called 'profit before ads' it read £16,934 beside the page's £18,709 (63p against the table's 69p): it names what it takes off
   const what = ctx.om ? 'products, delivery and other marketing' : 'products and delivery';
-  const f = p => { const s = Number(p.sales), o = Number(p.orders), ad = Number(p.ads), mp = mOf(p);
+  // 19 Nov: sales on the headline's basis (sales_net, delivery in) in every point, as the return panel reads them and as
+  // the margin m is measured. Goods-only sales read £10,762 here and £11,039 in the return panel for frkl's 30 days to 21 Oct
+  const f = p => { const s = v3SalesNet(p), o = Number(p.orders), ad = Number(p.ads), mp = mOf(p);
     // the latest week is the headline's own figure, so the panel and the verdict above it agree to the pound
     const v = ctx.anchor && String(p.d) === ctx.anchor.d ? ctx.anchor.v : s * mp - ad - O;
     return { s, o, ad, mp, aov: s / o, kept: s * mp, ms: Number(p.meta_spend), gs: Number(p.google_spend), n: Number(p.new_customers), v }; };
@@ -29115,7 +29118,7 @@ const V3_DRIVER_MODELS = {
   conv:   { model: v3ModelConv,     mode: 'pair',   key: 'conv',       fmt: v => v3Per100(v),
             ok: p => p.conv != null && Number(p.visits) > 0 && Number(p.web_orders) > 0 },
   profit: { model: v3ModelProfit,   mode: 'pair',   key: 'profit',     fmt: v3SignedGbp,
-            prep: (P, ctx) => P.map(p => Object.assign({}, p, { profit: ctx.anchor && String(p.d) === ctx.anchor.d ? ctx.anchor.v : Number(p.sales) * (ctx.mAt ? ctx.mAt(p.d) : ctx.m) - Number(p.ads) - (ctx.o || 0) })),
+            prep: (P, ctx) => P.map(p => Object.assign({}, p, { profit: ctx.anchor && String(p.d) === ctx.anchor.d ? ctx.anchor.v : v3SalesNet(p) * (ctx.mAt ? ctx.mAt(p.d) : ctx.m) - Number(p.ads) - (ctx.o || 0) })),
             ok: p => Number(p.sales) > 0 && Number(p.orders) > 0 && p.ads != null && p.meta_spend != null },
   cac:    { model: v3ModelCac,      mode: 'pair',   key: 'cac',        fmt: v => fmtMoney(v),
             ok: p => p.cac != null && p.new_customers > 0 && (Number(p.meta_clicks) + Number(p.google_clicks)) > 0 && p.cac_spend != null },
