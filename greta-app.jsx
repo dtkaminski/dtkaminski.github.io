@@ -15647,7 +15647,7 @@ function ConnectionsPanel(){
 
     {formOpen && (<section className="v3-sec" id="v3-shopify-connect">
       <h2 className="v3-sec-title">{LIVE_CONNS.some(x => x.provider === 'shopify') ? 'Reconnect Shopify' : 'Connect Shopify'}</h2>
-      <p className="v3-note v3-measure">Greta reads your store through a private app you make in your own Shopify account. It takes ten minutes, once, and the app can only read.</p>
+      <p className="v3-note v3-measure">Your store connects through a private app you make in your own Shopify account. It takes ten minutes, once, and the app can only read.</p>
       <ol className="v3-rank-steps">
         <li>Sign in at <b>dev.shopify.com</b> with the account that owns your store, and create an app called Greta.</li>
         <li>Create a version. Set the app URL to <code>https://dtkaminski.github.io</code> and add these access scopes: <code>{V3_SHOPIFY_SCOPES}</code>. Release it.</li>
@@ -15669,7 +15669,7 @@ function ConnectionsPanel(){
         </div>
       </form>
       {connectMsg && <p className={connectMsg.kind === 'ok' ? 'v3-note v3-ok' : 'v3-note v3-bad'} role="status">{connectMsg.text}</p>}
-      <p className="micro muted v3-measure">Greta checks the keys with Shopify before saving them. They stay on Greta's server and are never shown again. To stop access, uninstall the app in Shopify.</p>
+      <p className="micro muted v3-measure">The keys are checked with Shopify before they are saved, kept on the server, and never shown again. To stop access, uninstall the app in Shopify.</p>
     </section>)}
 
     {!UI_V3 && (    <section>
@@ -19069,7 +19069,8 @@ function V3MorningAlerts() {
   const st = useV3Rows('brand-state', V3_STATE_Q);
   const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
   const board = useV3Board();
-  const all = q.err || !q.rows || !q.rows[0] ? [] : (Array.isArray(q.rows[0].alerts) ? q.rows[0].alerts : []).filter(a => a.kind !== 'feed');
+  // 1300 gives the email a 'peak' alert; here the peak line below says it from the brand state, so it is not listed twice
+  const all = q.err || !q.rows || !q.rows[0] ? [] : (Array.isArray(q.rows[0].alerts) ? q.rows[0].alerts : []).filter(a => a.kind !== 'feed' && a.kind !== 'peak');
   // 18 Nov: a peak that starts within a week, or is under way, is the morning's news. Home said nothing of frkl's Black
   // Friday two days before it; the Calendar strip had it. Same state (peak_now first, 1268), same words as that strip.
   const S0 = st.rows && st.rows[0];
@@ -21904,8 +21905,16 @@ function V3Growth() {
   const fcOk = fc && Number(fc.forecast_revenue_period) > 0 && planWin > 0 && Math.abs(Number(fc.forecast_revenue_period) / planWin - 1) <= 0.3
     && (paceWin == null ? daysDone >= 7 : Math.abs(Number(fc.forecast_revenue_period) / paceWin - 1) <= 0.3);
   // With a sales goal the month's plan is the goal's, on the goal's ads, not the ads the plan would hold.
+  // 19 Nov eval: "Plan £84k ... with £8.7k of ads" put the confirmed plan's sales (fn_plan_progress, the yardstick
+  // since 14 Nov) beside the re-worked plan's ads. Each plan now carries its own ads and its own name, as on Goal and
+  // the Calendar: "On the plan you confirmed on 2 Oct, with £23k of ads. Worked out again on 18 Nov: £27k on £8.7k."
   const gkMo = GL ? (GL.months || []).find(m => String(m.month).slice(0, 7) === mStart.slice(0, 7)) : null;
-  const planBasis = tgt ? 'On the plan for your sales goal' + (gkMo ? ', with ' + v3GbpRound(gkMo.spend) + ' of ads' : '')
+  const MA = MP && MP.ad_spend, confOn = MP && MP.plan_source === 'confirmed' && MP.plan ? MP.plan.confirmed_on : null;
+  const reworked = gkMo && Number(gkMo.sales) > 0
+    ? 'Worked out again ' + v3ReworkedOn(g && g.rederived) + ': ' + v3GbpRound(gkMo.sales) + ' on ' + v3GbpRound(gkMo.spend) + ' of ads' : '';
+  const planBasis = confOn ? 'On the plan you confirmed on ' + v3Day(confOn) + (MA && Number(MA.plan_total) > 0 ? ', with ' + v3GbpRound(MA.plan_total) + ' of ads' : '')
+      + (reworked ? '. ' + reworked : '')
+    : tgt ? 'On the plan for your sales goal' + (gkMo ? ', with ' + v3GbpRound(gkMo.spend) + ' of ads' : '')
     : (PL && (PL.flags || []).indexOf('held_at_first_order_profit') >= 0) ? 'At the plan’s budget' : A ? 'With ' + v3AdsNear(A) : '';
   const monthRows = planMo && mtd != null && daysDone >= 3 ? [
     { k: 'Sales so far', v: fmtMoney(mtd), b: V3_PLAN_WORD[planMo.status] + ': ' + v3GbpRound(planMo.expected_by_now) + ' expected by now', cls: v3PlanTone(planMo.status) === 'bad' ? 'v3-down' : '' },
@@ -22005,7 +22014,7 @@ function V3Growth() {
       <div className="v3-panel-head"><h2>Peak month</h2><span className="v3-muted">{peakName}</span>
         <V3Conf state="probably" detail="From the plan for the quarter: your own busy and quiet months, returning customers at their recent rate, and new-customer sales that rise with spend as your own months show. Last year’s figures are what you actually spent and the new customers you won."/></div>
       <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
-        <thead><tr><th><span className="v3-sr-only">Figure</span></th>{ly && <th className="r">Last {peakName}</th>}<th className="r">Plan</th>{gk && <th className="r">Goal</th>}</tr></thead>
+        <thead><tr><th><span className="v3-sr-only">Figure</span></th>{ly && <th className="r">Last {peakName}</th>}<th className="r">{confOn ? 'Re-worked plan' : 'Plan'}</th>{gk && <th className="r">Goal</th>}</tr></thead>
         <tbody>{peakRows.map(r => (<tr key={r.k}><td>{r.k}</td>{ly && <td className="r">{r.ly != null ? r.ly : FMT_NONE}</td>}<td className="r">{r.pl}</td>{gk && <td className="r">{r.go}</td>}</tr>))}</tbody>
       </table></div>
       {beyond && <p className="v3-panel-note">{gk ? 'The goal spends' : 'The plan spends'} more than any month so far, so these are estimates.</p>}
@@ -25415,7 +25424,8 @@ function V3GoalLead() {
         </tbody>
       </table></div>
       {ph && maxSeen && rows.some(r => r.x > 1.5) && <p className="v3-panel-note">Past 1.5× your biggest month, the estimate goes beyond any spend seen so far.</p>}
-      {bs && ph && <p className="v3-panel-note">{onConf ? 'Worked out again ' + v3ReworkedOn(g && g.rederived) + ': ' : 'In the goal: '}{v3AdBudgetWords(bs, v3GbpRound).replace(/(^|, )([A-Z])/g, (m, a, c) => a + c.toLowerCase())}.{(() => { const AD = stAD.rows && stAD.rows[0] && stAD.rows[0].ad_decision; return AD && AD.decision === 'down' && Number(AD.hold_week) > 0 ? ' The plan' + (Number(AD.extra_ads) > 0 ? ' with no sales goal' : '') + ' averages ' + v3GbpRound(AD.hold_week) + ' a week to the quarter’s end: the budget is a most, not a target.' : null; })()}</p>}
+      {/* 19 Nov eval: "Worked out again on 18 Nov: this month's ad budget: £8.7k" chained two colons; the plan's day now follows the figures */}
+      {bs && ph && <p className="v3-panel-note">{v3AdBudgetWords(bs, v3GbpRound).replace(/(, )([A-Z])/g, (m, a, c) => a + c.toLowerCase())}{onConf ? ', worked out again ' + v3ReworkedOn(g && g.rederived) : ', from the goal'}.{(() => { const AD = stAD.rows && stAD.rows[0] && stAD.rows[0].ad_decision; return AD && AD.decision === 'down' && Number(AD.hold_week) > 0 ? ' The plan' + (Number(AD.extra_ads) > 0 ? ' with no sales goal' : '') + ' averages ' + v3GbpRound(AD.hold_week) + ' a week to the quarter’s end: the budget is a most, not a target.' : null; })()}</p>}
       {exp != null && <div className="v3-panel-note"><V3FcErr/></div>}
     </section>
   </>);
@@ -29256,6 +29266,44 @@ function V3StaleSuggestions() {
   </V3More>);
 }
 
+// 19 Nov eval: the day before frkl's Black Friday, Actions opened with the tracking check and the peak plan sat as a
+// step in the stock row's drawer at £99. Home and the morning line already lead with a peak that starts within a week
+// or is under way (brand state, peak_now first); Actions now does too, above Fix first, in the same words. The plan's
+// row keeps its place and figure on the board; this is the lead, with its own Take on.
+function v3PeakNear(stRows) {
+  const S0 = stRows && stRows[0], Pk = S0 && (S0.peak_now || S0.peak);
+  if (!Pk || !Pk.title) return null;
+  const uw = Pk.days_left != null, away = !uw && Pk.days_away != null ? Number(Pk.days_away) : null;
+  return uw || (away != null && away >= 0 && away <= 7) ? Object.assign({}, Pk, { uw, away }) : null;
+}
+function V3PeakFirst({ peak }) {
+  const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  const board = useV3Board();
+  const row = (board.rows || []).find(r => r.external_id === 'promo-peak-plan');
+  if (!peak || !row) return null;
+  const BM = bm.rows && bm.rows[0];
+  const lev = BM && Array.isArray(BM.rows) ? BM.rows.find(r => r.external_id === 'promo-peak-plan') : null;
+  const day = iso => v3Day(iso).replace(/ /g, ' ');
+  const when = peak.away <= 0 ? 'today' : peak.away === 1 ? 'tomorrow' : 'in ' + peak.away + ' days, on ' + day(String(peak.start).slice(0, 10));
+  const ly = Number(peak.ly_orders) > 0 && Number(peak.ly_sales) > 0
+    ? ' Last year it brought ' + fmtCount(Number(peak.ly_orders)) + ' orders and ' + fmtMoney(Number(peak.ly_sales))
+      + (Number(peak.ratio) > 0 ? ', at ' + fmtTimes(Number(peak.ratio), 1) + ' your usual pace' : '') + '.' : '';
+  const go = () => window.__oiGo && window.__oiGo('goal', null, 'promo-peak-plan');
+  return (<section className="v3-sec" aria-label="Peak">
+    <div className="v3-kick">Peak</div>
+    <p className="v3-note v3-measure v3-peak-lead"><b>{v3PlainWords(peak.title)} {peak.uw
+        ? <>is under way: day {fmtCount(Number(peak.day_no))} of {fmtCount(Number(peak.days))}, {fmtCount(Number(peak.days_left))} {Number(peak.days_left) === 1 ? 'day' : 'days'} left.</>
+        : <>starts {when}.</>}</b>{ly}{lev && !lev.taken_on ? ' Nobody has taken its plan on yet.' : ''}{' '}
+      <button type="button" className="v3-xref" onClick={go}>Open the plan</button></p>
+    <V3MoveDecide row={row} small/>
+  </section>);
+}
+function V3ActionsLead() {
+  const st = useV3Rows('brand-state', V3_STATE_Q);
+  const peak = v3PeakNear(st.rows);
+  return (<><V3PeakFirst peak={peak}/><V3FixFirst kick={peak ? 'Fix this as well' : undefined}/></>);
+}
+
 // Tracking first. When Greta has found that site tracking broke, every figure that rests on the shop's
 // record of where an order came from (cost per order by platform, where ads send people) reads low for
 // each channel and high for "direct". That is the one thing to fix before acting on those rows, so it
@@ -29825,7 +29873,7 @@ const V3_PAGES = {
     <V3ReviewTabs/>
   </>),
   actions: (p) => (<>
-    <V3FixFirst/>
+    <V3ActionsLead/>
     <ActionsView/>
     <V3BoardDrivers/>
     <V3Findings/>
