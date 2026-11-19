@@ -3708,9 +3708,19 @@ function v3TileDelta(v, was, fmt) {
   return { dir, delta: dir === 'flat' && ch == null ? '' : pct ? (Math.abs(ch) * 100).toFixed(1) + '%' : (fmt || fmtMoney)(Math.abs(d)),
            title: 'Against ' + (fmt || fmtMoney)(b) };
 }
+// 19 Nov eval: tranquillity (first order 14 Oct) was compared against 30 days holding 6 to 8 days of its orders, on
+// seven pages ("New customers 43, from 47 in 4 weeks", "+311%"). An earlier window is compared only when the shop
+// traded on at least half its days: the window's last day less half its length is on or after the first day.
+function v3PriorWindowOk(endIso, days) {
+  const f = (typeof window !== 'undefined' && window.GRETA_FIRST_DAY) || null;
+  if (!f || !endIso) return true;
+  return v3IsoAdd(String(endIso).slice(0, 10), -(Math.ceil((days || 30) / 2) - 1)) >= f;
+}
 // A strip tile against an earlier figure: up says which way is good, null when neither is.
 function v3TileAgainst(k, v, was, up, ser, fmt) {
   if (V3_AD_TILES[k] && v3NoAdAccount()) return <V3HomeTile key={k} k={k} v={FMT_NONE} delta="No ad account connected"/>;
+  // the earlier figure is the 30 days before the latest 30
+  if (was != null && !v3PriorWindowOk(v3IsoAdd(new Date().toISOString().slice(0, 10), -31), 30)) was = null;
   const t = v3TileDelta(v, was, fmt), dir = t.dir || 'flat';
   return <V3HomeTile key={k} k={k} v={v == null ? FMT_NONE : (fmt || fmtMoney)(v)} dir={dir} cls={up == null || dir === 'flat' ? '' : (dir === 'up') === up ? 'v3-up' : 'v3-down'}
     delta={t.delta} title={t.title} pts={ser}/>;
@@ -9417,6 +9427,13 @@ function v3AskScrub(text, facts) {
        .replace(/\s*\(\s*direct\s*\)/gi, '')
        .replace(/\(\s*board (?:action )?rank (\d+)\s*,\s*/gi, '(#$1 on your board, ')
        .replace(/\bboard (?:action )?rank (\d+)\b/gi, '#$1 on your board');
+  // 19 Nov eval: "about £5,561", "roughly £10.74". A hedge beside an exact figure: the figure is rounded to two
+  // significant figures (pounds under 10 to the whole pound), the hedge stays.
+  t = t.replace(/\b(about|roughly|around|nearly|almost|approximately)\s+£\s?(\d[\d,]*(?:\.\d+)?)(?![\d.,]*k\b)/gi, (m, w, n) => {
+    const v = Number(n.replace(/,/g, '')); if (!isFinite(v) || v === 0) return m;
+    const r = v < 10 ? Math.round(v) : Number(v.toPrecision(2));
+    return w + ' £' + r.toLocaleString('en-GB', { maximumFractionDigits: 0 });
+  });
   return t.replace(/\(\s*the figures\s*\)/g, '').replace(/[ \t]{2,}/g, ' ').replace(/ ([,.;:])/g, '$1');
 }
 // Two checks on a new answer, against the request that produced it.
@@ -9438,6 +9455,12 @@ function v3AskGoalLead(text, facts, question) {
   const said = facts && facts.goal_verdict && facts.goal_verdict.said, q = String(question || '');
   if (!said || !V3_ASK_ON_TRACK.test(q) || /\b(why|cut|spend\w*|ads?|budget)\b/i.test(q)) return text;
   return said;
+}
+// An answer given before today (London): its figures and next step were that day's, not today's board's.
+function v3AskIsOld(m) {
+  if (!m || !m.time) return false;
+  const day = t => new Date(t).toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+  return day(m.time) < day(Date.now());
 }
 function v3AskCheck(text, sent) {
   let t = String(text || '');
@@ -10076,8 +10099,14 @@ ${dataStr}`;
           </div>
           {/* Answers from ask_log or an older browser history were never checked (8 Oct: the stored "£445 a
               week" for Meta came back on another device). Checked once on arrival, or here on show. */}
-          {m.role === 'assistant' ? <V3AskMd text={m.checked ? m.content : v3AskCheck(v3AskScrub(m.content, null), null)}/> : <div style={{fontSize:'var(--text-sm)', whiteSpace:'pre-wrap', lineHeight:1.5, color:'var(--text-primary)'}}>{m.content}</div>}
-          {m.role==='assistant' && (<div style={{marginTop:8, display:'flex', gap:8, alignItems:'center'}}>
+          {/* 19 Nov eval: an answer from an earlier day was given today's board sentence as its next step (frkl's
+              20 Oct answer ended on the 19 Nov £841 cut, with "Save as task" beside it). An earlier day's answer is
+              shown as it was, scrubbed only, dated, and cannot be saved as a task. */}
+          {m.role === 'assistant' ? <V3AskMd text={m.checked ? m.content : (v3AskIsOld(m) ? v3AskScrub(m.content, null) : v3AskCheck(v3AskScrub(m.content, null), null))}/> : <div style={{fontSize:'var(--text-sm)', whiteSpace:'pre-wrap', lineHeight:1.5, color:'var(--text-primary)'}}>{m.content}</div>}
+          {m.role === 'assistant' && !m.checked && v3AskIsOld(m) && (<div style={{marginTop:'var(--space-2)', fontSize:'var(--text-xs)', color:'var(--text-muted)'}}>
+            On the figures of {new Date(m.time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}. Ask again for today's.
+          </div>)}
+          {m.role==='assistant' && !(!m.checked && v3AskIsOld(m)) && (<div style={{marginTop:8, display:'flex', gap:8, alignItems:'center'}}>
             <button onClick={()=>{ if(aiSaveTask(m.content)) setSavedTasks(s=>({...s,[m.time]:true})); }} disabled={!!savedTasks[m.time]}
               style={{padding:'4px 10px', background:savedTasks[m.time]?'transparent':PAL.panel, border:'1px solid '+(savedTasks[m.time]?'var(--good)':'#30303a'), borderRadius:'var(--radius-md)', color:savedTasks[m.time]?'var(--good)':PAL.faint, fontSize:'var(--text-xs)', cursor:savedTasks[m.time]?'default':'pointer'}}>
               {savedTasks[m.time]?'Saved to Weekly Board':'+ Save as task'}
@@ -10097,14 +10126,15 @@ function BrandAgeBanner(){
   const dates = D.shopify.map(r=>r.date).filter(Boolean).sort();
   if (!dates.length) return null;
   const first = new Date(dates[0]); const last = new Date(dates[dates.length-1]);
-  const days = Math.round((last - first) / (1000*60*60*24));
+  // 19 Nov eval: testio read "Short history, 0 days" over a day of orders. Days of trading count both ends.
+  const days = Math.round((last - first) / (1000*60*60*24)) + 1;
   if (days >= 60) return null;
   const sev = days < 14 ? 'critical' : days < 30 ? 'high' : 'medium';
   const colorVar = sev === 'critical' ? 'var(--bad)' : sev === 'high' ? 'var(--warn)' : 'var(--text-muted)';
   const bgVar = sev === 'critical' ? 'var(--bad-bg)' : sev === 'high' ? 'var(--warn-bg)' : 'var(--bg-card)';
   return (
     <div className="status-banner" style={{background: bgVar, borderColor: colorVar + '40', marginBottom: 'var(--s-3)'}}>
-      <span className="status-banner-tag" style={{color: colorVar}}>Short history, {days} days</span>
+      <span className="status-banner-tag" style={{color: colorVar}}>Short history, {days} {days === 1 ? 'day' : 'days'}</span>
       <span className="status-banner-body">{`
       Under 60 days of trading. Changes and ${curSym()} figures show direction, not size, and forecasts wait for more history.`}
       </span>
@@ -11803,11 +11833,12 @@ function V3ActionBoard(){
   const [cat, setCat] = React.useState('all');
   const [showSmall, setShowSmall] = React.useState(false);
   const [drawer, setDrawer] = React.useState(null);   // { id, mode }
+  const ff = useV3Rows('fix-first', V3_FIXFIRST_Q);           // 19 Nov eval: a fix-first row leads above this list
 
   if (err) return <section className="v3-panel v3-board"><V3LoadFailed what="Actions"/></section>;
   if (rows === null) return <section className="v3-panel v3-board" aria-busy="true"><div className="v3-panel-pad"><V3SkeletonRows n={5}/></div></section>;
   const laneAll = Array.isArray(unpriced) ? unpriced : [];
-  if (!rows.length && !laneAll.length) return <section className="v3-panel v3-board"><p className="v3-panel-note">No open actions. The list updates as new data arrives.</p></section>;
+  if (!rows.length && !laneAll.length) return <section className="v3-panel v3-board"><p className="v3-panel-note">{ff.rows && ff.rows.length ? 'No other open actions.' : 'No open actions.'} The list updates as new data arrives.</p></section>;
 
   const cats = [...new Set(rows.map(r => r.category).filter(Boolean))].sort();
   const shown = cat === 'all' ? rows : cat === 'none' ? [] : rows.filter(r => r.category === cat);
@@ -15531,6 +15562,9 @@ function ConnectionsPanel(){
   // button, for as long as the live read took (30s on a slow load) — on connections that were fine.
   const _L = typeof window !== 'undefined' && window.FRKL_LIVE;
   const checking = !!(_L && _L.session && !_L.lastFetchAt && !/^(error|static-only)$/.test(_L.status || ''));
+  // 19 Nov eval: when the live read failed, every source showed "Connect" and the Shopify form opened, on
+  // connections that may be fine. A failed check shows as not checked, with no button that would replace a connection.
+  const connFailed = !!(_L && _L.session && !checking && (_L.status === 'error' || !Array.isArray(_L.connections)));
 
   // Prefilled from the stored domain when there is one: a reconnect should not make
   // anyone retype the shop they are already connected to.
@@ -15546,7 +15580,7 @@ function ConnectionsPanel(){
   const shopOk = /^[a-z0-9][a-z0-9-]*(\.myshopify\.com)?$/i.test(shopDomain.trim());
   const keysOk = clientId.trim().length >= 16 && clientSecret.trim().length >= 16;
   const shopActive = LIVE_CONNS.some(x => x.provider === 'shopify' && x.status === 'active') || !!justConnected;
-  const formOpen = authed && (showShopifyForm || (!checking && !shopActive));
+  const formOpen = authed && (showShopifyForm || (!checking && !connFailed && !shopActive));
 
   const submitShopify = async (e) => {
     e.preventDefault(); if (connecting) return;
@@ -15594,13 +15628,13 @@ function ConnectionsPanel(){
           const syncStr = syncMs == null ? null : syncMs < 3600000 ? 'just now' : syncMs < 86400000 ? Math.floor(syncMs/3600000) + 'h ago' : syncN + 'd ago';
 
           const fresh = !!conn && syncN != null && syncN <= 1;
-          if (checking && s.provider) return (<div key={s.id} className="v3-conn-row">
+          if ((checking || connFailed) && s.provider) return (<div key={s.id} className="v3-conn-row">
             <div className="v3-conn-mark" aria-hidden="true">{s.icon}</div>
             <div className="v3-conn-body">
               <div className="v3-conn-name">{s.name}
-                <span className="v3-conn-state" style={{color:'var(--text-muted)'}}><i style={{background:'var(--text-muted)'}}/>Checking…</span>
+                <span className="v3-conn-state" style={{color:'var(--text-muted)'}}><i style={{background:'var(--text-muted)'}}/>{connFailed ? 'Not checked' : 'Checking…'}</span>
               </div>
-              <div className="v3-conn-meta">Checking the live connection</div>
+              <div className="v3-conn-meta">{connFailed ? 'The check on this connection did not load. Reload to try again.' : 'Checking the live connection'}</div>
               <div className="v3-conn-desc">{s.description}</div>
             </div>
           </div>);
@@ -20419,6 +20453,7 @@ function v3SignTrend(s) {
     const clean = pts.slice(0, -5).reverse().find(p => p.d && !v3WindowHasSale(String(p.d).slice(0, 10), SW));
     if (clean) { then = clean; beforeSale = true; }
   }
+  if (then.d && !v3PriorWindowOk(then.d, 30)) return null;   // 19 Nov eval: a base from before the shop traded half of it
   const ch = last.v - then.v, rel = Math.abs(then.v) > 0.0001 ? Math.abs(ch) / Math.abs(then.v) : Math.abs(ch);
   const dir = rel < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down';
   const good = dir === 'flat' ? null : (dir === 'up') === (s.better === 'higher');
@@ -20626,6 +20661,7 @@ function V3HomeActions({ q, board }) {
   useV3Rows('brand-state', V3_STATE_Q);   // the gap reads the ad answer
   const [drawer, setDrawer] = React.useState(null);   // { id, mode }
   const [sinceOpen, setSinceOpen] = React.useState(false);
+  const ff = useV3Rows('fix-first', V3_FIXFIRST_Q);   // 19 Nov eval: testio's Home said "No open actions" beside a reconnect row
   // 9 Nov eval: what changed since this person's last visit, on any device (1194); before, nothing rendered it
   const since = useV3SinceLook(g, board.rows ? v3LiveRows(board.rows) : null);
   const bmRows = bm.rows && bm.rows[0] && Array.isArray(bm.rows[0].rows) ? bm.rows[0].rows : [];
@@ -20642,7 +20678,12 @@ function V3HomeActions({ q, board }) {
   const laneAll = Array.isArray(board.unpriced) ? board.unpriced : [];
   const lane = moves.length ? laneAll.filter(r => r.due_on) : laneAll.slice(0, 4);
   const total = v3LiveRows(board.rows).length || (moves.length ? 0 : laneAll.length);
-  if (!moves.length && !lane.length) return <section className="v3-panel" id="v3-queue">{head(0)}<p className="v3-panel-note">No open actions. The list updates as new data arrives.</p></section>;
+  if (!moves.length && !lane.length) {
+    const fx = v3FixFirstRow(ff.rows);
+    return <section className="v3-panel" id="v3-queue">{head(0)}{fx
+      ? <p className="v3-panel-note"><b>{v3PlainAction(fx).title}.</b> {v3Tidy(scrubTag(String(fx.description || ''))).replace(/^([^.]+.).*$/s, '$1')} No other open actions.</p>
+      : <p className="v3-panel-note">No open actions. The list updates as new data arrives.</p>}</section>;
+  }
   const shared = g && g.confirmed && g.forecast != null;
   const F = shared ? v3Futures(g) : null;
   const gap = shared ? (F ? -F.ahead : Number(g.gap)) : null;
@@ -26756,12 +26797,16 @@ function V3DataTrust() {
   // the banner at the top of every page (state.freshness) and this verdict say the same thing: "Your feeds are
   // current" sat under "Your data is out of date. Shopify has sent nothing since 21 Oct" (Halden, 23 Oct)
   const FR = ((stq.rows || [])[0] || {}).freshness;
-  const feeds = FR && FR.stale && FR.said ? (FR.core_stale ? 'Your data is out of date (see the note at the top).' : 'Some of your data is out of date (see the note at the top).')
+  // 19 Nov eval: with the state read failed, FR was empty and this said "Your feeds are current" under a top bar
+  // that said the check failed. A failed read says so; it never reads as a healthy feed.
+  const frFailed = !!stq.err;
+  const feeds = frFailed ? 'The check on your feeds did not load, so this page cannot say whether they are current. Reload to try again.'
+    : FR && FR.stale && FR.said ? (FR.core_stale ? 'Your data is out of date (see the note at the top).' : 'Some of your data is out of date (see the note at the top).')
     : jobLate ? 'Your data is arriving, but a refresh that works it out has failed (see the note above), so some figures may lag.'
     : 'Your feeds are current.';
   // 18 Nov: with nothing listed the verdict still says what the banner says (testio: "Your feeds are current and
   // nothing is reading wrong" beside "Stale, last order 136 days ago")
-  const verdict = !items.length ? (jobLate || (FR && FR.stale && FR.said) ? feeds + ' Nothing else is reading wrong.' : 'Your feeds are current and nothing is reading wrong.')
+  const verdict = !items.length ? (frFailed ? feeds : jobLate || (FR && FR.stale && FR.said) ? feeds + ' Nothing else is reading wrong.' : 'Your feeds are current and nothing is reading wrong.')
     : feeds + ' ' + (items.length === 1 ? 'One thing makes' : v3Sentence(['', 'one', 'two', 'three', 'four', 'five', 'six'][items.length] || String(items.length)) + ' things make') + ' numbers read wrong: ' + shortList.join('; ') + (items.length > 3 ? '; and ' + (items.length - 3) + ' more below' : '') + '.';
   return (<div className="v3-page-stack"><section>
     <div className="v3-kick">Data trust</div>
@@ -27055,8 +27100,12 @@ const v3OnceBasis = b => V3_ONCE_RX.test(String(b || ''));
 const v3OnceOver = b => { const m = String(b || '').match(/\bonce,? (over [^:;)]+)/i); return 'once, ' + (m ? m[1].trim() : 'over the peak'); };
 const v3Once = r => v3OnceBasis(r && r.money_basis);
 const v3Per = (r, short) => (v3Once(r) ? (short ? ' once' : ' ' + v3OnceOver(r.money_basis)) : (short ? '/mo' : ' a month'));
-const V3_STATE_Q = (sb, b) => v3StateRow(sb, b, 'state').then(s => s ? { data: [s], error: null }
-  : sb.rpc('fn_brand_state', { p_brand: b }).then(r => ({ data: r.data ? [r.data] : [], error: r.error })));
+// 19 Nov eval: the shop's first trading day (state.baseline.year.first_day, 1172) is kept for the comparison rule
+// (v3PriorWindowOk) every page's tiles go through.
+const v3KeepFirstDay = s => { try { const f = s && s.baseline && s.baseline.year && s.baseline.year.first_day;
+  if (typeof window !== 'undefined') window.GRETA_FIRST_DAY = f ? String(f).slice(0, 10) : null; } catch (e) {} return s; };
+const V3_STATE_Q = (sb, b) => v3StateRow(sb, b, 'state').then(s => s ? { data: [v3KeepFirstDay(s)], error: null }
+  : sb.rpc('fn_brand_state', { p_brand: b }).then(r => ({ data: r.data ? [v3KeepFirstDay(r.data)] : [], error: r.error })));
 const V3_CODES_Q = (sb, b) => sb.from('vw_brand_code_performance').select('code,orders_365d,net_sales_365d,avg_depth,first_order_share,last_used,orders_90d')
   .eq('brand_id', b).order('orders_365d', { ascending: false }).limit(12);
 // where a figure sits against its rule-of-thumb range: 'good', 'ok' or 'weak'
@@ -27487,7 +27536,10 @@ function V3BusinessState({ part }) {
       t: <>The discount code <b>{topCode.code}</b>, not an ad platform. It brought {fmtCount(topCode.orders_365d)} orders in the last year, {fmtPctN(num(topCode.first_order_share))} of them from first-time buyers, at {fmtPctN(num(topCode.avg_depth))} off on average.</> });
   if (S.peak_now && S.peak_now.title)
     items.push({ k: 'Your busy period',
-      t: <>{v3PlainWords(S.peak_now.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '')} is under way: day {fmtCount(num(S.peak_now.day_no))} of {fmtCount(num(S.peak_now.days))}. The same days last year sold {fmtMoney(num(S.peak_now.ly_sales))}.</> });
+      // 1305: the finished days against the same days last year (state.peak_now.so_far, ly_so_far)
+      t: <>{v3PlainWords(S.peak_now.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '')} is under way: day {fmtCount(num(S.peak_now.day_no))} of {fmtCount(num(S.peak_now.days))}. {num(S.peak_now.days_done) > 0 && S.peak_now.so_far != null && num(S.peak_now.ly_so_far) > 0
+        ? <>The first {num(S.peak_now.days_done) === 1 ? 'day' : fmtCount(num(S.peak_now.days_done)) + ' days'} sold {fmtMoney(num(S.peak_now.so_far))}, against {fmtMoney(num(S.peak_now.ly_so_far))} on the same {num(S.peak_now.days_done) === 1 ? 'day' : 'days'} last year. All {fmtCount(num(S.peak_now.days))} days last year sold {fmtMoney(num(S.peak_now.ly_sales))}.</>
+        : <>The same days last year sold {fmtMoney(num(S.peak_now.ly_sales))}.</>}</> });
   if (P && P.title)
     items.push({ k: 'Your next busy period',
       t: <>It is {fmtCount(P.days_away)} days until {v3PlainWords(P.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '')}. The same days last year sold {fmtMoney(num(P.ly_sales))}{P.top_codes && P.top_codes[0] && num(P.ly_orders) > 0 ? <>, and {P.top_codes[0].code} brought {fmtPctN(num(P.top_codes[0].orders) / num(P.ly_orders))} of those orders</> : null}.</> });
@@ -29326,15 +29378,25 @@ function V3ActionsLead() {
 // record of where an order came from (cost per order by platform, where ads send people) reads low for
 // each channel and high for "direct". That is the one thing to fix before acting on those rows, so it
 // sits above the board rather than unranked below it.
+// 19 Nov eval: testio's Actions said "No open actions" beside an open connection-shopify row ("Shopify stopped
+// reporting on 6 Jul"). Every row the unpriced lane files as fix_first (action_unpriced_lane: connection-,
+// data-stale-, data-health-, measurement-integrity-, tracking-coverage) leads here: a broken source first.
 const V3_FIXFIRST_Q = (sb, b) => sb.from('actions').select('external_id,description,raised_at')
-  .eq('brand_id', b).eq('status', 'open').eq('external_id', 'tracking-coverage').limit(1);
+  .eq('brand_id', b).eq('status', 'open')
+  .or('external_id.eq.tracking-coverage,external_id.like.connection-%,external_id.like.data-stale-%,external_id.like.data-health-%,external_id.like.measurement-integrity-%')
+  .order('raised_at', { ascending: true }).limit(8);
+const v3FixFirstOrder = id => (/^connection-/.test(id) ? 0 : /^data-stale-/.test(id) ? 1 : id === 'tracking-coverage' ? 2 : 3);
+function v3FixFirstRow(rows) {
+  return (rows || []).slice().sort((a, b) => v3FixFirstOrder(a.external_id) - v3FixFirstOrder(b.external_id))[0] || null;
+}
 function V3FixFirst({ kick }) {
   const q = useV3Rows('fix-first', V3_FIXFIRST_Q);
   const board = useV3Board();
   if (q.err || !q.rows || !q.rows.length) return null;
-  const r = q.rows[0];
+  const r = v3FixFirstRow(q.rows);
+  const more = q.rows.length - 1;
   const live = board.rows ? v3LiveRows(board.rows) : [];
-  const hit = live.map(x => ({ x, i: (v3BoardRank(live, x.external_id) || 0) - 1 })).filter(o => o.i >= 0 && /^(order-cost|paid-landing)-/.test(o.x.external_id))
+  const hit = r.external_id !== 'tracking-coverage' ? [] : live.map(x => ({ x, i: (v3BoardRank(live, x.external_id) || 0) - 1 })).filter(o => o.i >= 0 && /^(order-cost|paid-landing)-/.test(o.x.external_id))
     .filter((o, k, A) => A.findIndex(p => p.i === o.i) === k);
   // One line and a fold: the full finding ran to a screen and a half on a phone (2026-10-06).
   const desc = v3Tidy(scrubTag(String(r.description || '')));
@@ -29343,7 +29405,7 @@ function V3FixFirst({ kick }) {
   if (/So far in \w+ \([\d,]+ orders\) it is still off/.test(desc)) first = first.replace(/ and is still off in \w+\.$/, ' and is still off this month.');
   return (<section className="v3-sec">
     <div className="v3-kick">{kick || 'Fix first'}</div>
-    <p className="v3-note v3-measure"><b>{v3PlainAction(r).title}.</b> {first}{hit.length > 0 && <> Until it is fixed, your shop undercounts the orders each ad channel brings. So {hit.map(o => '#' + (o.i + 1)).join(', ').replace(/, ([^,]*)$/, ' and $1')} on the board {hit.length === 1 ? 'is' : 'are'} less certain.</>}</p>
+    <p className="v3-note v3-measure"><b>{v3PlainAction(r).title}.</b> {first}{hit.length > 0 && <> Until it is fixed, your shop undercounts the orders each ad channel brings. So {hit.map(o => '#' + (o.i + 1)).join(', ').replace(/, ([^,]*)$/, ' and $1')} on the board {hit.length === 1 ? 'is' : 'are'} less certain.</>}{more > 0 && <> {fmtCount(more)} more to fix on <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('settings', 'connections')}>Connections &amp; data</button>.</>}</p>
     <V3More id="fixfirst-why" label="The detail">
       <p className="v3-note v3-measure">{desc}</p>
       {hit.length > 0 && <p className="micro muted v3-measure">Those rows rely on the orders your shop credits to each channel, and that count reads low while tracking is broken. Where the ad platform’s own count and the weeks without a sale agree, the direction still holds. Act on {hit.length === 1 ? 'it' : 'them'}, and expect the exact figures to move once tracking is fixed.</p>}
