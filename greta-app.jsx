@@ -3711,8 +3711,15 @@ function v3TileDelta(v, was, fmt) {
 // 19 Nov eval: tranquillity (first order 14 Oct) was compared against 30 days holding 6 to 8 days of its orders, on
 // seven pages ("New customers 43, from 47 in 4 weeks", "+311%"). An earlier window is compared only when the shop
 // traded on at least half its days: the window's last day less half its length is on or after the first day.
+// The first trading day: brand state's (set wherever the state is read, and from Today's bundle), else the first day
+// of the daily sales the loader holds, so a page that never reads the state still knows it.
+function v3FirstDay() {
+  const w = (typeof window !== 'undefined' && window.GRETA_FIRST_DAY) || null;
+  if (w) return w;
+  try { const ds = (D.shopify || []).map(r => r.date).filter(Boolean).sort(); return ds.length ? String(ds[0]).slice(0, 10) : null; } catch (e) { return null; }
+}
 function v3PriorWindowOk(endIso, days) {
-  const f = (typeof window !== 'undefined' && window.GRETA_FIRST_DAY) || null;
+  const f = v3FirstDay();
   if (!f || !endIso) return true;
   return v3IsoAdd(String(endIso).slice(0, 10), -(Math.ceil((days || 30) / 2) - 1)) >= f;
 }
@@ -11541,7 +11548,7 @@ function v3BoardLoad(){
   // server's one-ladder verdict, evidence_reasons says what moved it. PostgREST replaces the
   // view's ORDER BY with .order(), so order by board_rank here. Before 0237 is applied the
   // columns do not exist and PostgREST rejects the select: fall back a step at a time.
-  const EVIDENCE = ',rung,lane,board_rank,evidence_reasons,money_is_sales,days_since_refresh,evidence_checked_at';
+  const EVIDENCE = ',rung,lane,board_rank,evidence_reasons,money_is_sales,days_since_refresh,evidence_checked_at,folded_into';
   const ask = (cols, byRank) => sb.from('vw_brand_action_board').select(cols)
     .eq('brand_id', b).order(byRank ? 'board_rank' : 'cm_gbp', byRank ? { ascending: true } : { ascending: false, nullsFirst: false });
   // 0991: the unpriced lane rides on Today's call; without it, one read of the view
@@ -11673,7 +11680,7 @@ function v3FoldPlans(rows) {
       out = out.filter(r => r === lead || !steps.includes(r))
         .map(r => r === lead ? Object.assign({}, lead, { plan: { key: k, title: lev[lead.external_id].lever_label, steps: sorted } }) : r);
     });
-    return out;
+    return v3FoldCounted(out);
   }
   for (const P of V3_PLANS) {
     const steps = out.filter(r => P.ids.includes(r.external_id));
@@ -11683,6 +11690,24 @@ function v3FoldPlans(rows) {
     out = out.filter(r => r === lead || !P.ids.includes(r.external_id))
       .map(r => r === lead ? Object.assign({}, lead, { plan: { key: P.key, title: P.title, steps } }) : r);
   }
+  return v3FoldCounted(out);
+}
+// 19 Nov eval: a row the server has already counted in another (folded_into, 1223) was drawn as its own numbered row,
+// "£1.5k a month" two places under rank 1's £906 that already holds it. It now sits under the row that counts it,
+// as a step that goes with it, with no figure of its own. Without the parent on the list it stays where it was.
+function v3FoldCounted(rows) {
+  let out = rows || [];
+  const kids = out.filter(r => r.folded_into);
+  if (!kids.length) return out;
+  const home = id => out.find(r => r.external_id === id || (r.plan && r.plan.steps.some(st => st.external_id === id)));
+  kids.forEach(k => {
+    const p = home(k.folded_into);
+    if (!p || p === k) return;
+    const step = Object.assign({}, k, { counted: true });
+    const plan = p.plan ? Object.assign({}, p.plan, { steps: [...p.plan.steps, step] })
+      : { key: 'counted:' + p.external_id, counted: true, title: '', steps: [p, step] };
+    out = out.filter(r => r !== k).map(r => r === p ? Object.assign({}, p, { plan }) : r);
+  });
   return out;
 }
 // The board's "bring Meta back toward £1,444 a week" targets, added up as a month. The quarter plan puts
@@ -11947,7 +11972,8 @@ function V3PlanSteps({ plan, rank }) {
           <span className="v3-rank-desc">{rank != null ? 'Goes with it: ' : ''}{pa.title}</span>
           <span className="v3-rank-meta">{st.lane === 'test' ? 'Worth testing' : 'Do this'}{st.origin === 'order_cost' ? ', ad spend saved' : ''}</span>
         </span>
-        <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">{v3Per(st, true)}</span></span>
+        {st.counted ? <span className="v3-rank-gbp"><span className="v3-rank-per">In the figure above</span></span>
+          : <span className="v3-rank-gbp">{v3GbpRound(gbp)}<span className="v3-rank-per">{v3Once(st) ? ' once' : v3Per(st)}</span></span>}
       </button>
       {isOpen && (<div className="v3-rank-why">
         <V3MoveDecide row={st} small/>
@@ -15702,7 +15728,7 @@ function ConnectionsPanel(){
             <input type="password" value={clientSecret} onChange={e => setClientSecret(e.target.value)} autoComplete="new-password" spellCheck={false}/></label>
         </div>
         <div className="v3-btns v3-gap-top">
-          <button type="submit" className="v3-btn v3-btn-p" disabled={connecting || !shopOk || !keysOk}>{connecting ? 'Checking with Shopify…' : 'Connect'}</button>
+          <button type="submit" className="v3-btn v3-btn-p" disabled={connecting || !shopOk || !keysOk}>{connecting ? 'Checking with Shopify…' : LIVE_CONNS.some(x => x.provider === 'shopify') ? 'Reconnect' : 'Connect'}</button>
           {shopActive && <button type="button" className="v3-btn v3-btn-q" onClick={() => { setShowShopifyForm(false); setConnectMsg(null); }}>Cancel</button>}
         </div>
       </form>
@@ -17359,7 +17385,7 @@ function v3PlainAction(row){
   // sentence stays in raw, and the board shows it under "Greta's working".
   const n = V3_WRITER_ACTIONS && V3_NARR.data && V3_NARR.data.actions && V3_NARR.data.actions[id];
   if (n && n.title) return { title: n.title, why: n.why || '', raw, written: true };
-  if (row && row.plan) return { title: row.plan.title, raw,
+  if (row && row.plan && !row.plan.counted) return { title: row.plan.title, raw,
     why: v3Sentence(['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'][row.plan.steps.length] || String(row.plan.steps.length)) + ' changes on the same budget, in the order to make them: ' + row.plan.steps.map(st => v3PlainAction(Object.assign({}, st, { plan: null })).title.replace(/^./, c => c.toLowerCase())).join('; ') + '.' };
   let x;
   // 1110: one target per title, a verb first. ad-budget's paragraph gave three ("cut to £19,119 a week ... then
@@ -19188,7 +19214,7 @@ function V3MoveCard({ row, rank, closes, closesTo, meta, dense, viz, onDecided, 
       <div className="v3-mv-main">
         <h3 className="v3-mv-t">{pa.title}</h3>
         {cause && <p className={'v3-mv-cause' + (dense ? ' clamp' : '')}>{cause}</p>}
-        {others.length > 0 && <p className="v3-mv-plan">{row.plan.title}: this and {others.length === 1 ? 'one more step' : others.length + ' more steps'} on the same budget, below.</p>}
+        {others.length > 0 && <p className="v3-mv-plan">{row.plan.counted ? (others.length === 1 ? 'One more step is counted in this figure, below.' : others.length + ' more steps are counted in this figure, below.') : row.plan.title + ': this and ' + (others.length === 1 ? 'one more step' : others.length + ' more steps') + ' on the same budget, below.'}</p>}
         {meta && <p className="v3-mv-meta">{meta}</p>}
       </div>
       {gbp > 0 && <div className="v3-mv-worth">
@@ -20457,6 +20483,7 @@ function v3SignTrend(s) {
     if (clean) { then = clean; beforeSale = true; }
   }
   if (then.d && !v3PriorWindowOk(then.d, 30)) return null;   // 19 Nov eval: a base from before the shop traded half of it
+  if (!Number(last.v) && !Number(then.v)) return null;   // 19 Nov eval (testio): "0, from 0 in 4 weeks" says nothing
   const ch = last.v - then.v, rel = Math.abs(then.v) > 0.0001 ? Math.abs(ch) / Math.abs(then.v) : Math.abs(ch);
   const dir = rel < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down';
   const good = dir === 'flat' ? null : (dir === 'up') === (s.better === 'higher');
@@ -20942,7 +20969,7 @@ function V3SetupChecklist() {
           <span className="v3-step-mark" aria-hidden="true">{x.done ? <Icon name="check" size={13} stroke={2.4}/> : i + 1}</span>
           <span className="v3-step-body"><b>{x.done ? x.done_label : x.label}</b>
             {x.key === 'costs' && <V3CostGapLine compact/>}</span>
-          {!x.done && <button type="button" className={'v3-btn v3-btn-sm' + (i === next ? ' v3-btn-p' : '')} onClick={() => go(x)}>{(V3_SETUP_GO[x.key] || [])[2] || 'Open'}</button>}
+          {!x.done && <button type="button" className={'v3-btn v3-btn-sm' + (i === next ? ' v3-btn-p' : '')} onClick={() => go(x)}>{String(x.label || '').startsWith('Reconnect') ? 'Reconnect' : (V3_SETUP_GO[x.key] || [])[2] || 'Open'}</button>}
         </li>))}
     </ol>
   </section>);
@@ -22114,6 +22141,12 @@ function V3Stock() {
   const sq = useV3Rows('stock-sum', V3_STOCK_SUM_Q);
   const lq = useV3Rows('brand-cfg', V3_BCFG_Q);    // the brand's supplier lead time
   const figQ = useV3Figures();   // slow_stock (1072's one list, registered in 1080)
+  // 19 Nov eval: "174 units at landed cost" where no product cost holds freight or duty. The same test as
+  // Connections & data's freight item: landed only when the costs are, or a brand rate fills them in.
+  const lcq = useV3Rows('trust-cogs', (sb, b) => sb.from('vw_brand_cogs_quality').select('cogs_coverage_90d,realized_cogs_pct,cogs_landed_complete,lines_total,lines_costed').eq('brand_id', b).limit(1));
+  const lfd = useV3Rows('fd-rate', V3_FDR_Q);
+  const landed = !(lcq.rows && lcq.rows[0] && !lcq.rows[0].cogs_landed_complete
+    && !(lfd.rows && lfd.rows[0] && Number(lfd.rows[0].freight_duty_rate) > 0));
   const L = v3Lead(lq.rows);
   const P = useV3Peak(L.days);
   // the stock list's own peak and lead time (fn_stock_reorder_summary), as the board reads them
@@ -22249,7 +22282,7 @@ function V3Stock() {
       {/* 11 Nov: the figures lead; "Order 4 products today." was a sentence used as a headline */}
       {order.length > 0 && <div className="v3-stat-grid">
         {stat('To order', fmtCount(order.length) + (order.length === 1 ? ' product' : ' products'), [outNow > 0 ? fmtCount(outNow) + ' already out' : preN > 0 ? '' : 'none out yet', preN > 0 ? fmtCount(preN) + ' on pre-order' : ''].filter(Boolean).join(', '))}
-        {stat('Order cost', fmtMoney(cost), fmtCount(unitsAll) + ' units at landed cost')}
+        {stat('Order cost', fmtMoney(cost), fmtCount(unitsAll) + (landed ? ' units at landed cost' : ' units, before freight and duty'))}
         {/* 18 Nov: a forecast, rounded (Halden "£34,048 a month" beside the row's "about £34,000") */}
         {protect != null && stat('Profit it protects', v3About(protect) + ' a month', 'from ' + v3Day(land))}
         {afterPk && stat('Peak units', fmtCount(SM.units_peak), (num(SM.order_cost_peak_gbp) > 0 ? fmtMoney(SM.order_cost_peak_gbp) + ', ' : '') + (pkBy ? 'only if delivered by ' + v3Day(pkBy) : 'only if delivered before the peak'))}
@@ -22261,7 +22294,7 @@ function V3Stock() {
         {/* 1149: products on pre-order are already below zero and still selling: they are not "run out", the sentence after the cost says what they are */}
         <V3Brief>{nRun - preN > 0 ? <>{fmtCount(nRun - preN)} will run out before new stock could arrive{outRun > 0 ? <> ({fmtCount(outRun)} already out)</> : null}{nPeak > 0 ? <>, and {fmtCount(nPeak)} more won’t last through {pkName}</> : null}. </> : nPeak > 0 ? <>{fmtCount(nPeak)} won’t last through {pkName}. </> : null}
           Stock takes {L.entered ? L.weeks + ' weeks' : lead + ' days'} to arrive after you order, so an order placed today arrives around <b>{v3Day(land)}</b>.{protect ? <> From then it protects about <b>{v3About(protect)} a month</b> of profit</> : null}{protect && peakAt ? <>, and the peak’s extra units about <b>{v3About(peakAt)}</b> once, over {pkName}.</> : protect ? '.' : null}
-          {' '}{afterPk ? <>Ordering them ({fmtCount(unitsAll)} units) costs </> : nRun > 0 && nPeak > 0 ? <>With the peak’s extra units, ordering all {fmtCount(order.length)} ({fmtCount(unitsAll)} units) costs </> : <>Ordering all of them ({fmtCount(unitsAll)} units) costs </>}{fmtMoney(cost)} at landed cost, meaning what each unit costs once it reaches you{unpriced > 0 ? <> ({fmtCount(unpriced)} without a cost yet)</> : null}.
+          {' '}{afterPk ? <>Ordering them ({fmtCount(unitsAll)} units) costs </> : nRun > 0 && nPeak > 0 ? <>With the peak’s extra units, ordering all {fmtCount(order.length)} ({fmtCount(unitsAll)} units) costs </> : <>Ordering all of them ({fmtCount(unitsAll)} units) costs </>}{fmtMoney(cost)}{landed ? ' at landed cost, meaning what each unit costs once it reaches you' : ' at product cost; freight and duty are not in your costs yet'}{unpriced > 0 ? <> ({fmtCount(unpriced)} without a cost yet)</> : null}.
           {afterPk ? <>{' '}For {pkName}, {fmtCount(SM.units_peak)} more units{num(SM.order_cost_peak_gbp) > 0 ? <> (about {v3About(SM.order_cost_peak_gbp)})</> : null} would help, but stock ordered today lands after it: order those only if a supplier can deliver them{pkBy ? <> by <b>{v3Day(pkBy)}</b></> : null}.</> : null}
           {preN > 0 && owedN > 0 ? <>{' '}{preN === order.length ? 'All of them sell' : fmtCount(preN) + ' of them sell'} on pre-order: Shopify keeps selling them when out, so they lose no sales, and customers have already bought <b>{fmtCount(owedN)} units</b> you do not hold yet. The order includes them.</> : null}
           {' '}{SM.at_stake_basis && <V3Conf state="probably" detail={SM.at_stake_basis + (SM.rule ? ' ' + SM.rule : '')}/>}</V3Brief>
@@ -23743,16 +23776,19 @@ function V3Products() {
       const o = S[k] || (S[k] = { oh: 0, v: 0 }); o.oh += Math.max(0, Number(s.on_hand) || 0); o.v += Number(s.weekly_velocity) || 0; });
     const born = {}; (made.rows || []).forEach(r => { if (r.created_at_shopify) born[String(r.shopify_product_id)] = v3Iso10(r.created_at_shopify); });
     const today = new Date().toISOString().slice(0, 10), recent = v3IsoAdd(today, -56);
+    // 19 Nov eval (tranquillity, first order 14 Oct): "+311%" against 28 days holding a week of orders. The 28 days
+    // before are compared only when the shop traded on at least half of them.
+    const priorOk = v3PriorWindowOk(v3IsoAdd(today, -29), 28);
     const list = rows.map(x => {
       const k = String(x.shopify_product_id || x.product_title), c = C[k] || null, st = S[String(x.product_title || '').trim().toLowerCase()] || null;
       const now = Number(x.rev_28d) || 0, was = Number(x.rev_prior_28d) || 0;
       const isNew = !!(born[String(x.shopify_product_id)] && born[String(x.shopify_product_id)] >= recent);
       const out = !!(st && st.oh === 0 && (st.v > 0 || was > 0));
-      return { title: v3Title(x.product_title), now, was, units: Number(x.units_now) || 0, unitsWas: Number(x.units_prior) || 0, d: now - was, ch: was > 0 ? now / was - 1 : null,
+      return { title: v3Title(x.product_title), now, was, units: Number(x.units_now) || 0, unitsWas: Number(x.units_prior) || 0, d: now - was, ch: priorOk && was > 0 ? now / was - 1 : null, early: !priorOk,
         kept: c ? c.kept : null, margin: c && c.rev > 0 ? c.kept / c.rev : null, off: c && c.list > 0 ? 1 - c.listed / c.list : null,
         out, low: !out && !!x.stock_constrained, isNew, back: !isNew && was <= 0 && now > 0 };
     });
-    const total = list.reduce((a, x) => a + x.now, 0), was = list.reduce((a, x) => a + x.was, 0), units = list.reduce((a, x) => a + x.units, 0);
+    const total = list.reduce((a, x) => a + x.now, 0), was = priorOk ? list.reduce((a, x) => a + x.was, 0) : 0, units = list.reduce((a, x) => a + x.units, 0);
     const keptTot = list.reduce((a, x) => a + (x.kept || 0), 0), keptRev = list.filter(x => x.kept != null).reduce((a, x) => a + x.now, 0);
     // Was the 28 days before a sale? Its total against the median of the six 28-day windows before it.
     let sale = null;
@@ -24001,7 +24037,7 @@ function V3Products() {
           <td className="r">{fmtMoney(x.now)}</td>
           <td className={'r v3-mk-opt' + (x.kept != null && x.kept < 0 ? ' v3-down' : '')}>{x.kept != null ? fmtMoney(x.kept) : FMT_NONE}</td>
           <td className={'r' + (x.margin != null && x.margin < 0 ? ' v3-down' : '')}>{x.margin != null ? fmtPctN(x.margin) : FMT_NONE}</td>
-          <td className={'r ' + (x.ch == null ? 'v3-muted' : x.ch >= 0 ? 'v3-up' : 'v3-down')}>{x.ch != null ? (x.ch >= 0 ? '+' : '−') + fmtPctN(Math.abs(x.ch)) : x.isNew ? 'New' : 'None before'}</td>
+          <td className={'r ' + (x.ch == null ? 'v3-muted' : x.ch >= 0 ? 'v3-up' : 'v3-down')}>{x.ch != null ? (x.ch >= 0 ? '+' : '−') + fmtPctN(Math.abs(x.ch)) : x.early ? FMT_NONE : x.isNew ? 'New' : 'None before'}</td>
           <td className="r v3-mk-opt">{fmtCount(x.units)}</td>
         </tr>))}
           {(showAll || top.length <= 12) && <tr className="tot"><td>All products</td><td className="r">{fmtMoney(d.total)}</td><td className="r v3-mk-opt">{haveKept ? fmtMoney(d.keptTot) : FMT_NONE}</td><td className="r">{margin != null ? fmtPctN(margin) : FMT_NONE}</td>
@@ -29130,7 +29166,7 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
       <div className="v3-kick">What to do</div>
       {todo.map(t => (<button key={t.row.external_id} type="button" className="v3-drivers-todo-row" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
         <span className="v3-num">{t.rank ? '#' + t.rank : ''}</span><span>{v3PlainAction(t.row).title}</span>
-        <span className="v3-num">{t.row.cm_gbp ? v3Gbp(t.row.cm_gbp) + v3Per(t.row, true) : ''}</span><Icon name="arrowRight" size={13}/></button>))}
+        <span className="v3-num">{t.row.cm_gbp ? v3GbpRound(t.row.cm_gbp) + (v3Once(t.row) ? ' once' : v3Per(t.row)) : ''}</span><Icon name="arrowRight" size={13}/></button>))}
     </div>}
     <div className={'v3-drivers-grid' + (fixed ? ' v3-drivers-grid-one' : '')}>
       <figure className="v3-bridge v3-bridge-wide" role="img" aria-label={M.startK + ' ' + M.fmtV(M.from) + ' to ' + M.fmtV(M.to)}>

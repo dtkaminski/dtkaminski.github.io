@@ -269,6 +269,8 @@
         window.GRETA_TODAY_BUNDLE = j || null;
         var be = j && j.state && j.state.state && j.state.state.ads ? Number(j.state.state.ads.break_even_return) : NaN;
         if (isFinite(be) && be > 0) window.GRETA_BREAK_EVEN = be;
+        var fd = j && j.state && j.state.state && j.state.state.baseline && j.state.state.baseline.year ? j.state.state.baseline.year.first_day : null;
+        if (fd && !window.GRETA_FIRST_DAY) window.GRETA_FIRST_DAY = String(fd).slice(0, 10);
         return j || null;
       });
     }
