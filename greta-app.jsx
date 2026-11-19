@@ -17327,12 +17327,13 @@ function v3PlainAction(row){
   // 1110: one target per title, a verb first. ad-budget's paragraph gave three ("cut to £19,119 a week ... then
   // £35,370 a week in November ..."): the title keeps this month's weekly figure, the why says what the last 7 days ran at.
   if (id === 'ad-budget' && (x = m(/to (?:about )?(£[\d,]+) a week for the rest of (\w+)/))) {
-    const was = m(/from (£[\d,]+) in the last 7 days(?: \(([^)]+)\))?/), times = (m(/ran at about ([\d.]+) times that/) || [])[1];
+    // 18 Nov (1297): the ratio is worked out to one place, so it reads without "about" (and the row's own words dropped it)
+    const was = m(/from (£[\d,]+) in the last 7 days(?: \(([^)]+)\))?/), times = (m(/ran at (?:about )?([\d.]+) times that/) || [])[1];
     // 12 Nov (1254): the row says when its budget is the confirmed plan worked out again; the rebuilt why dropped it,
     // so Actions and the drawer showed a cut with nothing to tell the two plans apart
     const plans = (m(/The plan you confirmed on [^.]+\./) || [])[0], holds = (m(/This weekly figure holds until [^.]+\./) || [])[0];
     return P('Cut all your ads to ' + x[1] + ' a week for the rest of ' + x[2],
-      was ? 'Your ads ran at ' + was[1] + ' in the last 7 days' + (was[2] ? ' (' + was[2] + ')' : '') + (times ? ', about ' + times + ' times that' : '') + '.' + (holds ? ' ' + holds : '') + (plans ? ' ' + plans : '') : raw);
+      was ? 'Your ads ran at ' + was[1] + ' in the last 7 days' + (was[2] ? ' (' + was[2] + ')' : '') + (times ? ', ' + times + ' times that' : '') + '.' + (holds ? ' ' + holds : '') + (plans ? ' ' + plans : '') : raw);
   }
   // site-funnel-weakstep led with its evidence and no instruction ("About 13% fewer of your visits end in an order")
   if (id === 'site-funnel-weakstep') {
@@ -25302,7 +25303,7 @@ function V3GoalLead() {
     fig: 'Most the ' + reWord + ' lands ' + v3GbpRound(reachBest) + (best ? ', at ' + v3GbpRound(best) + ' of ads' : '') + (lySales ? '. Last year ' + fmtMoney(lySales) : '') });
   if (g && ph) checks.push({ k: 'ads', t: 'Plan ' + gpMonthName(peak.iso) + '’s ads',
     sub: mc > 0 && fop > 0 ? 'At that spend the last new customers cost ' + v3GbpRound(mc) + ' each. A first order makes ' + v3GbpRound(fop) + (ltv ? ', ' + v3GbpRound(ltv) + ' over a year' : '') + '.' : '',
-    fig: v3GbpRound(peak.gSpend) + (peak.x != null ? ', ' + fmtTimes(peak.x, 1) + ' your biggest month' : '') + (onConf ? ', worked out again ' + v3ReworkedOn(G && ph === G.months ? null : g && g.rederived) : '') });
+    fig: v3GbpRound(peak.gSpend) + (peak.x != null ? ', ' + fmtTimes(peak.x, 1) + ' your biggest month' : '') + (onConf ? ', worked out again ' + v3ReworkedOn(g && g.rederived) : '') });   // 1294: the kept plan holds; it was worked out on the goal row's day
   if (g) {
     const wait = L.entered ? L.weeks + ' weeks from order to arrival' : L.days + ' days from order to arrival, assumed until you add yours';
     if (PDG && SQG.peak) {
@@ -25353,8 +25354,8 @@ function V3GoalLead() {
         <div className="v3-home-tiles">
           <V3HomeTile k="On the plan" v={v3GbpRound(adsPlan)} delta={planAdsDelta}/>
           {/* 1231 follow-up: beside the confirmed plan, these two are today's re-plan, so they say so */}
-          {g && unreach ? <V3HomeTile k={onConf ? 'Re-plan reach' : 'Most the plan reaches'} v={v3GbpRound(reachBest)} delta={v3GbpRound(tgt - reachBest) + ' short of the goal' + (onConf ? ', on today’s figures' : '')}/>
-            : g && adsGoal != null ? <V3HomeTile k={onConf ? 'Re-plan ads' : 'The goal takes'} v={v3GbpRound(adsGoal)} delta={onConf ? 'for the goal, on today’s figures' : ph ? v3GbpRound(peak.gSpend) + ' in ' + gpMonthName(peak.iso) : ''}/> : null}
+          {g && unreach ? <V3HomeTile k={onConf ? 'Re-plan reach' : 'Most the plan reaches'} v={v3GbpRound(reachBest)} delta={v3GbpRound(tgt - reachBest) + ' short of the goal' + (onConf ? ', worked out again ' + v3ReworkedOn(g && g.rederived) : '')}/>
+            : g && adsGoal != null ? <V3HomeTile k={onConf ? 'Re-plan ads' : 'The goal takes'} v={v3GbpRound(adsGoal)} delta={onConf ? 'for the goal, worked out again ' + v3ReworkedOn(g && g.rederived) : ph ? v3GbpRound(peak.gSpend) + ' in ' + gpMonthName(peak.iso) : ''}/> : null}
         </div></div>
       {!g && <div className="v3-panel-note v3-goal-call v3-goal-full"><span>{endedOn ? 'Your last goal ended ' + endedOn + '. None is set for this quarter.' : 'No goal confirmed yet.'}</span>{setGoal}</div>}
       {/* 12 Nov re-eval: the goal and its plan are both before other marketing costs; Home's profit after ads takes them off (Halden 79,516 against 90,576 for the same 30 days) */}
@@ -25400,7 +25401,7 @@ function V3GoalLead() {
       <div className="v3-panel-head"><h2>Month by month</h2><span className="v3-muted">Plans, rounded</span>
         <V3Conf state="probably" detail={'How the quarter is planned: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (costWord.value != null ? fmtMoney(costWord.value, 2) + ' (' + costWord.label.toLowerCase() + ')' : B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + (B.cost_per_new_customer_basis ? ': ' + B.cost_per_new_customer_basis + '.' : ' because the quarter includes Black Friday, when new customers come cheaper.') + ' The Customers page shows the last 90 days.' + (PQ && PQ.basis_note ? ' ' + PQ.basis_note : '')}/></div>
       <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
-        <thead><tr><th>Month</th>{ph && <th className="r" title="What the sales goal takes, re-planned on today’s figures">Sales goal, re-planned</th>}<th className="r" title="The plan with no sales goal: ads a first order pays for">No sales goal</th><th className="r" title={ppd != null ? 'What each month has sold so far, plus your average day over the last 30 days (' + fmtMoney(ppd) + ') for each day left' : undefined}>At today’s pace</th>{ph && <th className="r">Ads, goal re-planned</th>}<th className="r v3-mk-opt">Ads, no sales goal</th>{ph && maxSeen && <th className="r v3-mk-opt" title={'Your biggest month of ads so far was ' + fmtMoney(maxSeen)}>× biggest month</th>}</tr></thead>
+        <thead><tr><th>Month</th>{ph && <th className="r" title={'What the sales goal takes, worked out again ' + v3ReworkedOn(g && g.rederived)}>Sales goal, re-planned</th>}<th className="r" title="The plan with no sales goal: ads a first order pays for">No sales goal</th><th className="r" title={ppd != null ? 'What each month has sold so far, plus your average day over the last 30 days (' + fmtMoney(ppd) + ') for each day left' : undefined}>At today’s pace</th>{ph && <th className="r">Ads, goal re-planned</th>}<th className="r v3-mk-opt">Ads, no sales goal</th>{ph && maxSeen && <th className="r v3-mk-opt" title={'Your biggest month of ads so far was ' + fmtMoney(maxSeen)}>× biggest month</th>}</tr></thead>
         <tbody>{rows.map(r => (<tr key={r.iso}>
           <td>{gpMonthName(r.iso)}</td>
           {ph && <td className="r">{v3GbpRound(r.goal)}</td>}
@@ -25414,7 +25415,7 @@ function V3GoalLead() {
         </tbody>
       </table></div>
       {ph && maxSeen && rows.some(r => r.x > 1.5) && <p className="v3-panel-note">Past 1.5× your biggest month, the estimate goes beyond any spend seen so far.</p>}
-      {bs && ph && <p className="v3-panel-note">{onConf ? 'Worked out again on today’s figures: ' : 'In the goal: '}{v3AdBudgetWords(bs, v3GbpRound).replace(/(^|, )([A-Z])/g, (m, a, c) => a + c.toLowerCase())}.{(() => { const AD = stAD.rows && stAD.rows[0] && stAD.rows[0].ad_decision; return AD && AD.decision === 'down' && Number(AD.hold_week) > 0 ? ' The plan' + (Number(AD.extra_ads) > 0 ? ' with no sales goal' : '') + ' averages ' + v3GbpRound(AD.hold_week) + ' a week to the quarter’s end: the budget is a most, not a target.' : null; })()}</p>}
+      {bs && ph && <p className="v3-panel-note">{onConf ? 'Worked out again ' + v3ReworkedOn(g && g.rederived) + ': ' : 'In the goal: '}{v3AdBudgetWords(bs, v3GbpRound).replace(/(^|, )([A-Z])/g, (m, a, c) => a + c.toLowerCase())}.{(() => { const AD = stAD.rows && stAD.rows[0] && stAD.rows[0].ad_decision; return AD && AD.decision === 'down' && Number(AD.hold_week) > 0 ? ' The plan' + (Number(AD.extra_ads) > 0 ? ' with no sales goal' : '') + ' averages ' + v3GbpRound(AD.hold_week) + ' a week to the quarter’s end: the budget is a most, not a target.' : null; })()}</p>}
       {exp != null && <div className="v3-panel-note"><V3FcErr/></div>}
     </section>
   </>);
