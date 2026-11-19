@@ -3945,7 +3945,9 @@ function V3ProfitLead({ view, costsVerified }) {
   if ((rfGap != null && rfGap > 0) || noFreight) checks.push({ k: rfGap > 0 ? 'Refunds' : 'Freight and duty',
     d: (rfGap > 0 ? 'Profit reads ' + fmtMoney(rfGap) + ' too high: refunds are ' + fmtPctN(Number(rfRow.realised_value) / 100) + ' of sales, not the ' + fmtPctN(Number(rfRow.config_value) / 100) + ' entered.' : 'Profit reads too high.') + (noFreight ? ' Product costs leave out shipping them to you and import duty.' : ''),
     btn: goBtn('goal', 'Fix costs', false, 'costs-off') });
-  if (oh30 == null) checks.push({ k: 'Running costs', d: 'Not entered, so net profit cannot be worked out.', btn: goBtn('goal', 'Add running costs', false, 'economics') });
+  // 19 Nov eval: with the figures read failed, this said "Running costs: Not entered" for a shop that had entered them
+  if (oh30 == null && figQ.err) checks.push({ k: 'Running costs', d: 'Did not load, so net profit is not shown. Reload to try again.' });
+  else if (oh30 == null && figQ.rows) checks.push({ k: 'Running costs', d: 'Not entered, so net profit cannot be worked out.', btn: goBtn('goal', 'Add running costs', false, 'economics') });
   checks.push({ k: 'Shopify’s sales figure', d: 'Shopify’s home screen shows more for the same days: it adds VAT, the delivery you charge, orders later refunded and other places you sell. Sales here are your own shop’s, after refunds and before VAT.' });
   if (costsVerified) checks.push({ k: 'Your costs', d: 'Profit uses the costs you entered.', btn: goBtn('goal', 'Edit costs', false, 'costs') });
 
@@ -15040,8 +15042,9 @@ function GretaPlanPanel({ show } = {}) {
       {/* goal setter */}
       {isSetter && (<section className="v3-panel" aria-label="This quarter’s goal">
         <V3Anchor id="goal-set"/>
-        <div className="v3-panel-head"><h2>{UI_V3 && g ? 'Change the goal' : 'Set a goal'}</h2><span className="v3-muted">This quarter</span></div>
+        <div className="v3-panel-head"><h2>{UI_V3 && g ? 'Change the goal' : P.goalErr ? 'Quarter goal' : 'Set a goal'}</h2><span className="v3-muted">This quarter</span></div>
         <div className="v3-panel-pad">
+        {!g && P.goalErr && <p className="v3-note v3-measure" role="status">Your goal did not load, so this page cannot say whether one is set. Reload to try again before setting one.</p>}
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="v3-seg" role="group" aria-label="Goal basis">
             <button aria-pressed={basis === 'cam'} onClick={function () { setBasis('cam'); }}>Profit after ads</button>
@@ -22369,6 +22372,12 @@ function V3StockOffer() {
   const lead = rows.find(r => r.lead_days != null) ? num(rows.find(r => r.lead_days != null).lead_days) : L.days;
   const land = v3IsoAdd(todayIso, lead);
   if (pk.start <= todayIso || land <= pk.start) return null;   // an order can still land in time: the list above covers it
+  // 19 Nov eval: with only the actions read failed, this page built its own lists (6 and 6 against the plan's 3 and 4)
+  // and said nothing. A failed read of the plan says so; the page's own lists are only for a brand with no plan.
+  if (planQ.err) return (<div className="v3-page-stack"><section className="v3-sec">
+    <div className="v3-kick">Your next busy period, {pkName}, {v3Day(pk.start)} – {v3Day(pk.end, true)}</div>
+    <V3LoadFailed what="The peak plan’s product lists" onRetry={planQ.retry}/>
+  </section></div>);
   // the sea order lands after the peak; until the week before it starts, stock can still come sooner (the plan's air step)
   const afterEnd = land > pk.end, inBy = v3IsoAdd(pk.start, -7), canSooner = inBy >= todayIso;
   const T = {}; rows.forEach(r => { const t = keyOf(r.product_title); if (!t || v3IsBundle(t)) return;

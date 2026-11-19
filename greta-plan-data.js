@@ -51,6 +51,8 @@
     // rail and Plan tab render; the heavy scoreboard/forecast views fill in afterwards.
     var g = await withRetry(function () { return s.from('mos_business_goal').select('*').eq('brand_id', b).lte('period_start', PERIOD.end).gte('period_end', PERIOD.start).order('created_at', { ascending: false }).limit(1); }, 8000);
     if (g && g.data) window.FRKL_PLAN.goal = g.data[0] || null;
+    // 19 Nov eval: a failed goal read left goal null and the page offered "Set a goal" to a shop that has one
+    window.FRKL_PLAN.goalErr = (!g || g.error || !g.data) ? 'failed' : null;
     var cfg = await withRetry(function () { return s.from('brand_config').select('updated_at, gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual, seasonality, opening_cash, opening_cash_as_of, benchmarks, supplier_lead_time_weeks, cash_floor').eq('brand_id', b).limit(1); }, 8000);
     if (cfg && cfg.data) window.FRKL_PLAN.config = cfg.data[0] || null;
     // Say which reads failed, so a screen can tell "you have not set this" from "we could not load
