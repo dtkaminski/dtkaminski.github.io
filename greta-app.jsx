@@ -27245,7 +27245,9 @@ function v3BuildSigns(S, hist, opts) {
     // 1293: and the headline's orders (refunded-in-full ones in, as the history now counts them), so sales per order
     // divides the headline's sales by the headline's count within the hour too
     const ov = num(L.orders) > 0 ? num(L.orders) : p.orders;
-    return Object.assign({}, p, { sales: sv, sales_net: sv, ads: av, orders: ov, return: av > 0 ? Math.round(sv / av * 100) / 100 : p.return,
+    // 19 Nov eval: and the registry's new customers (218 on frkl's tile, 216 in both Why panels from the daily table)
+    const ncReg = v3Fig('new_customers_30d').value, nc = ncReg > 0 ? ncReg : p.new_customers;
+    return Object.assign({}, p, { sales: sv, sales_net: sv, ads: av, orders: ov, new_customers: nc, return: av > 0 ? Math.round(sv / av * 100) / 100 : p.return,
       vs_ly: sl > 0 ? Math.round((sv / sl - 1) * 1000) / 1000 : p.vs_ly, ads_vs_ly: al > 0 ? Math.round(av / al * 100) / 100 : p.ads_vs_ly });
   })()]) : HP0;
   const ser = k => HP ? HP.map(p => ({ d: String(p.d), v: p[k] == null ? null : Number(p[k]) })) : null;
@@ -27300,7 +27302,7 @@ function v3BuildSigns(S, hist, opts) {
   const lastP = HP && HP.length ? HP[HP.length - 1] : null;
   const anchor = lastP ? { d: String(lastP.d), v: ao != null ? ao : num(L.profit_after_ads) } : null;
   const mAt = mKept != null && lastP ? v3MarginAt(H && H.weeks, mKept, String(lastP.d)) : null;
-  const profitCfg = mKept != null ? { which: 'profit', ctx: { m: mKept, mAt, o: ao != null ? oh30s : 0, anchor, weeks: H && Array.isArray(H.weeks) ? H.weeks : [] }, dline: 0 } : null;
+  const profitCfg = mKept != null ? { which: 'profit', ctx: { m: mKept, mAt, o: ao != null ? oh30s : 0, anchor, om: (Number(v3Fig('other_marketing_30d').value) || 0) >= 1, weeks: H && Array.isArray(H.weeks) ? H.weeks : [] }, dline: 0 } : null;
   // website conversion (0314): the latest 30 days against the middle of the earlier weeks
   const CP = HP ? HP.filter(p => p.conv != null) : [];
   if (CP.length >= 4) {
@@ -28700,6 +28702,9 @@ function v3MarginAt(weeks, m, lastD) {
 }
 function v3ModelProfit(a, b, ctx) {
   const m = ctx.m, O = ctx.o || 0, mOf = p => (ctx.mAt ? ctx.mAt(p.d) : m);
+  // 19 Nov eval: the ratio is the headline's (profit after ads + ads) / sales, so other marketing is already off it.
+  // Called 'profit before ads' it read £16,934 beside the page's £18,709 (63p against the table's 69p): it names what it takes off
+  const what = ctx.om ? 'products, delivery and other marketing' : 'products and delivery';
   const f = p => { const s = Number(p.sales), o = Number(p.orders), ad = Number(p.ads), mp = mOf(p);
     // the latest week is the headline's own figure, so the panel and the verdict above it agree to the pound
     const v = ctx.anchor && String(p.d) === ctx.anchor.d ? ctx.anchor.v : s * mp - ad - O;
@@ -28727,7 +28732,7 @@ function v3ModelProfit(a, b, ctx) {
         cause: <>orders were {v3UpDown(A.aov, B.aov, 'bigger', 'smaller')} on average ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)})</>,
         against: <>{v3UpDown(A.aov, B.aov, 'Bigger', 'Smaller')} orders ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)} on average)</> },
       ...(ctx.mAt ? [{ amt: kM, k: v3UpDown(A.mp, B.mp, 'More kept from each £1', 'Less kept from each £1'), sub: pence(A.mp) + ' to ' + pence(B.mp) + ' of each £1',
-        cause: <>each £1 of sales kept {v3UpDown(A.mp, B.mp, 'more', 'less')} after products and delivery ({pence(A.mp)} to {pence(B.mp)}){sAw > sBw && B.mp > A.mp ? <>, as fewer orders were marked down</> : sBw > sAw && B.mp < A.mp ? <>, as more orders were marked down</> : null}</>,
+        cause: <>each £1 of sales kept {v3UpDown(A.mp, B.mp, 'more', 'less')} after {what} ({pence(A.mp)} to {pence(B.mp)}){sAw > sBw && B.mp > A.mp ? <>, as fewer orders were marked down</> : sBw > sAw && B.mp < A.mp ? <>, as more orders were marked down</> : null}</>,
         against: <>{v3UpDown(A.mp, B.mp, 'More', 'Less')} kept from each £1 ({pence(A.mp)} to {pence(B.mp)})</> }] : []),
       { amt: -dMeta, k: v3UpDown(A.ms, B.ms, 'More Meta spend', 'Less Meta spend'), sub: fmtMoney(A.ms) + ' to ' + fmtMoney(B.ms),
         cause: <>Meta ad spend went {v3UpDown(A.ms, B.ms, 'up', 'down')} ({fmtMoney(A.ms)} to {fmtMoney(B.ms)})</>,
@@ -28738,21 +28743,21 @@ function v3ModelProfit(a, b, ctx) {
         against: <>{v3UpDown(A.ad - A.ms, B.ad - B.ms, 'More', 'Less')} Google ad spend ({fmtMoney(A.ad - A.ms)} to {fmtMoney(B.ad - B.ms)})</> },
     ],
     opening: <>Since the 30 days to {v3Day(String(a.d), true)}, the business went from {state(A.v)} a month {label} to {state(B.v)}.</>,
-    closing: <> Each £1 of sales keeps about {Math.round(m * 100)}p after products and delivery now, so every £1,000 of sales lost costs about {v3About(m * 1000)} of profit{O ? <>, while running costs stay at {fmtMoney(O)} every 30 days</> : null}.</>,
+    closing: <> Each £1 of sales keeps about {Math.round(m * 100)}p after {what} now, so every £1,000 of sales lost costs about {v3About(m * 1000)} of profit{O ? <>, while running costs stay at {fmtMoney(O)} every 30 days</> : null}.</>,
     rows: [
       ['Sales', A.s, B.s, v => fmtMoney(v), 'higher'],
       ['Orders', A.o, B.o, v => fmtCount(v), 'higher'],
       ['Sales per order after refunds', A.aov, B.aov, v => fmtMoney(v, 2), 'higher'],
-      ...(ctx.mAt ? [['Profit before ads per £1', A.mp, B.mp, pence, 'higher']] : []),
-      ['Profit before ads', A.kept, B.kept, v => fmtMoney(v), 'higher'],
+      ...(ctx.mAt ? [[ctx.om ? 'Kept from each £1 before ads' : 'Profit before ads per £1', A.mp, B.mp, pence, 'higher']] : []),
+      [ctx.om ? 'Kept before ads' : 'Profit before ads', A.kept, B.kept, v => fmtMoney(v), 'higher'],
       ['Ad spend: Meta', A.ms, B.ms, v => fmtMoney(v), 'lower'],
       ['Ad spend: Google and other', A.ad - A.ms, B.ad - B.ms, v => fmtMoney(v), 'lower'],
       ...(O ? [['Running costs', O, O, v => fmtMoney(v), null]] : []),
       [O ? 'After all costs' : 'After ads', A.v, B.v, v3SignedGbp, 'higher'],
     ],
     note: ctx.mAt
-      ? 'This is the headline figure worked out for each 30 days: sales times what each £1 kept after products and delivery in those weeks (from your orders, so a sale month keeps less), scaled so the latest 30 days uses your measured ' + Math.round(m * 100) + 'p, less ad spend' + (O ? ' and ' + fmtMoney(O) + ' of running costs every 30 days' : '') + '. Orders, order size and what each £1 kept multiply to what was kept, so the parts add up to the change exactly.'
-      : 'This is the headline figure worked out for each 30 days: sales times the ' + Math.round(m * 100) + 'p each £1 keeps after products and delivery (your measured margin, used for every week, as the headline does), less ad spend' + (O ? ' and ' + fmtMoney(O) + ' of running costs every 30 days' : '') + '. So it moves with sales and ad spend. When Greta measures your margin again, every week moves with it.',
+      ? 'This is the headline figure worked out for each 30 days: sales times what each £1 kept after ' + what + ' in those weeks (from your orders, so a sale month keeps less), scaled so the latest 30 days uses your measured ' + Math.round(m * 100) + 'p, less ad spend' + (O ? ' and ' + fmtMoney(O) + ' of running costs every 30 days' : '') + '. Orders, order size and what each £1 kept multiply to what was kept, so the parts add up to the change exactly.'
+      : 'This is the headline figure worked out for each 30 days: sales times the ' + Math.round(m * 100) + 'p each £1 keeps after ' + what + ' (your measured margin, used for every week, as the headline does), less ad spend' + (O ? ' and ' + fmtMoney(O) + ' of running costs every 30 days' : '') + '. So it moves with sales and ad spend. When Greta measures your margin again, every week moves with it.',
   };
 }
 // Website conversion (0314): orders per 100 visits = web orders / visits, with visits from Clarity less
