@@ -3718,6 +3718,12 @@ function v3FirstDay() {
   if (w) return w;
   try { const ds = (D.shopify || []).map(r => r.date).filter(Boolean).sort(); return ds.length ? String(ds[0]).slice(0, 10) : null; } catch (e) { return null; }
 }
+// 19 Nov eval (tranquillity): "A year earns £35" beside "First order earns £35.83". The figure was a 1-month cohort:
+// a shop trading under a year has no year to show, so every "a year" value waits until it has one.
+function v3YearKnown() {
+  const f = v3FirstDay();
+  return !f || f <= v3IsoAdd(new Date().toISOString().slice(0, 10), -365);
+}
 function v3PriorWindowOk(endIso, days) {
   const f = v3FirstDay();
   if (!f || !endIso) return true;
@@ -8986,7 +8992,7 @@ async function v3AskFacts(question) {
   // the last 30 days decide whether a new customer pays back (as Today, Customers and Growth say it)
   const SU = (r0(stateR) && r0(stateR).state && r0(stateR).state.unit) || {};
   if (U || fg('cac_30d') != null) f.customers = { cost_to_win_a_new_customer_last_30_days: fgOr('cac_30d', SU.cac_30d), cost_to_win_a_new_customer_90d: fgOr('cac_90d', SU.cac),
-    profit_on_a_first_order: fgOr('first_order_profit', SU.first_order_contribution), profit_from_a_customer_over_a_year: fgOr('customer_value', SU.ltv_contribution),
+    profit_on_a_first_order: fgOr('first_order_profit', SU.first_order_contribution), profit_from_a_customer_over_a_year: v3YearKnown() ? fgOr('customer_value', SU.ltv_contribution) : null,
     which_decides: 'the last 30 days: compare it with the profit on a first order; the 90-day figure is context' };
   const C = r0(cfgR) || {};
   const lead = Number(C.supplier_lead_time_weeks) > 0 ? Number(C.supplier_lead_time_weeks) : null;
@@ -11564,7 +11570,7 @@ function v3BoardLoad(){
       return j;
     }, () => { askLane().then(u => { V3_BOARD.unpriced = u || []; if (V3_BOARD.rows) v3BoardNotify(); }); return null; })
     .then(j => (j && Array.isArray(j.board) && j.board.length) ? { data: j.board, error: null } : ask(COLS + MONEY + EVIDENCE, true), () => ask(COLS + MONEY + EVIDENCE, true))
-    .then(r => (r && r.error && /rung|lane|board_rank|evidence_reasons|money_is_sales|days_since_refresh|evidence_checked_at/.test(r.error.message || '')) ? ask(COLS + MONEY, false) : r)
+    .then(r => (r && r.error && /rung|lane|board_rank|evidence_reasons|money_is_sales|days_since_refresh|evidence_checked_at|folded_into/.test(r.error.message || '')) ? ask(COLS + MONEY, false) : r)
     .then(r => (r && r.error && /money_/.test(r.error.message || '')) ? ask(COLS, false) : r)
     .then(r => {
       V3_BOARD.loading = false;
@@ -19500,7 +19506,7 @@ function V3TodayMoves({ q, board, gc }) {
     : besides > 0 ? <>Besides the ad cut, the other {rest.length === 1 ? 'one adds' : rest.length === 2 ? 'two add' : 'moves add'} about <b>{v3About(besides)}</b> {to}, if each starts this week.</>
     : <>The top three add about <b>{v3About(together)}</b> {to}, if each starts this week.</>;
   // the cause behind the ad cut, in the row it explains
-  const cac = v3Fig('cac_30d', fig.rows).value, fo = v3Fig('first_order_profit', fig.rows).value, cv = v3Fig('customer_value', fig.rows).value;
+  const cac = v3Fig('cac_30d', fig.rows).value, fo = v3Fig('first_order_profit', fig.rows).value, cv = v3YearKnown() ? v3Fig('customer_value', fig.rows).value : null;
   let cutWhy = null;
   if (cac > 0 && fo != null && cac > fo) {
     const top = Math.max(cac, fo, Number(cv) || 0) * 1.08;
@@ -20674,7 +20680,7 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
   </tr>);
 }
 function v3CutWhy(figRows) {
-  const cac = v3Fig('cac_30d', figRows).value, fo = v3Fig('first_order_profit', figRows).value, cv = v3Fig('customer_value', figRows).value;
+  const cac = v3Fig('cac_30d', figRows).value, fo = v3Fig('first_order_profit', figRows).value, cv = v3YearKnown() ? v3Fig('customer_value', figRows).value : null;
   if (!(cac > 0 && fo != null && cac > fo)) return null;
   const top = Math.max(cac, fo, Number(cv) || 0) * 1.08;
   const bar = (k, v, c) => (<div className="v3-mvrun-row" key={k}><span className="v3-mvrun-k">{k}</span>
@@ -21913,7 +21919,7 @@ function V3Growth() {
   // What a first order earns: the canonical first-order figure (Customers), not the average order.
   const fopR = v3Fig('first_order_profit', figGr.rows).value, fop = fopR > 0 ? fopR : null;
   const c30R = v3Fig('cac_30d', figGr.rows), c30v = c30R.value > 0 ? c30R.value : null;
-  const ltv = U && Number(U.ltv_contribution) > 0 ? Number(U.ltv_contribution) : null;
+  const ltv = U && Number(U.ltv_contribution) > 0 && v3YearKnown() ? Number(U.ltv_contribution) : null;
   const marg = sc && Number(sc.marginal_cac_now) > 0 ? Number(sc.marginal_cac_now) : null;
   const S0 = stQ.rows && stQ.rows[0], A = S0 && S0.ad_decision;
   // 1220: the registry's 30-day count, the one Today and Marketing show; the tiers only while it loads
@@ -23208,7 +23214,7 @@ function V3Customers({ start, period, customActive }) {
 
   const t30 = (tierQ.rows || [])[0] || null, u = (ue.rows || [])[0] || null, R0 = (ret.rows || [])[0] || null;
   const ncF = v3Fig('new_customers_30d', figQ.rows), c30F = v3Fig('cac_30d', figQ.rows), c90F = v3Fig('cac_90d', figQ.rows), foF = v3Fig('first_order_profit', figQ.rows);
-  const ltv = v3Fig('customer_value', figQ.rows).value, ratio = v3Fig('value_to_cost_30d', figQ.rows).value;
+  const ltv = v3YearKnown() ? v3Fig('customer_value', figQ.rows).value : null, ratio = v3YearKnown() ? v3Fig('value_to_cost_30d', figQ.rows).value : null;
 
   const onFig = !customActive && period === '30d';
   const end = dataEndOf(), prior = priorPeriod(start, end);
@@ -25348,7 +25354,7 @@ function V3GoalLead() {
   const gSpend = regPlan && fq('plan_quarter_ad_spend') != null ? fq('plan_quarter_ad_spend') : G ? Number(G.spend_cap) : (g ? Number(g.spend_cap) : null);
   const B = (G || P).breakdown || {};
   const mc = Number(B.marginal_cost_per_new_customer), fop = Number(B.first_order_profit);
-  const ltv = U && Number(U.ltv_contribution) > 0 ? Number(U.ltv_contribution) : null;
+  const ltv = U && Number(U.ltv_contribution) > 0 && v3YearKnown() ? Number(U.ltv_contribution) : null;
   // The goal's profit on today's figures (the stored one used the margin of the day it was confirmed),
   // against today's pace: what the extra ads buy in profit, not just in sales.
   const gCam = regPlan && fq('plan_quarter_profit_after_ads') != null ? fq('plan_quarter_profit_after_ads') : G ? Number(G.cam_target) : (g ? Number(g.cam_target) : null);
@@ -26530,7 +26536,10 @@ function V3Competitors() {
 
   // What winning the rest of the searches for your name would take, while the board has no action on it
   const sig2 = v => { const p = Math.pow(10, Math.max(0, Math.floor(Math.log10(Math.max(1, v))) - 1)); return Math.round(v / p) * p; };
-  const winBack = (() => { if (!brandC || missed < 0.05 || brandC.B.is <= 0 || live.some(r => String(r.external_id).startsWith('paid-brand-share-google'))) return null;
+  // 19 Nov eval: "220 more clicks for £59" here beside the board's "240 for £68". The board row can sit inside a
+  // folded plan whose lead is not a Competitors row, so read the whole board: with the row on it, its figures stand alone.
+  const onBoard = id => (bd.rows || []).some(x => String(x.external_id).startsWith(id));
+  const winBack = (() => { if (!brandC || missed < 0.05 || brandC.B.is <= 0 || onBoard('paid-brand-share-google')) return null;
     const extra = brandC.B.clicks / brandC.B.is - brandC.B.clicks, cpc = brandC.B.spend / brandC.B.clicks;
     return { extra: sig2(extra), cost: sig2(extra * cpc), cpc }; })();
 
@@ -27559,7 +27568,7 @@ function V3BusinessState({ part }) {
     // 1080: cac_30d, first_order_profit and value_to_cost_30d as registered; no fallback to the 90-day cost.
     const cF = v3Fig('cac_30d', figQ.rows), c30 = cF.value, foR = v3Fig('first_order_profit', figQ.rows).value;
     const use = c30, fo = foR != null ? foR : num(U.first_order_contribution);
-    const ratio = v3Fig('value_to_cost_30d', figQ.rows).value;
+    const ratio = v3YearKnown() ? v3Fig('value_to_cost_30d', figQ.rows).value : null;
     if (use > 0) items.push({ k: 'Winning new customers', tone: use > fo ? 'weak' : 'good',
       t: <>{cF.label}: {fmtMoney(c30)}.{' '}
         Their first order earns you {fmtMoney(fo)} after product and delivery costs{use > fo ? ', so you lose money on them until they buy again.' : ', so the first order pays for them.'}</> });
@@ -29619,7 +29628,7 @@ function V3ReviewHealth() {
   const R0 = retQ.rows && retQ.rows[0];
   const opc = R0 && R0.orders_per_customer != null ? Number(R0.orders_per_customer) : null;
   const base = R0 && R0.customers != null ? Number(R0.customers) : null;
-  const value = v3Fig('customer_value', figQ.rows).value, cac = v3Fig('cac_30d', figQ.rows).value, ratio = v3Fig('value_to_cost_30d', figQ.rows).value;
+  const value = v3YearKnown() ? v3Fig('customer_value', figQ.rows).value : null, cac = v3Fig('cac_30d', figQ.rows).value, ratio = v3YearKnown() ? v3Fig('value_to_cost_30d', figQ.rows).value : null;
   const repF = v3Fig('repeat_90d', figQ.rows), repeat90 = repF.value != null ? Number(repF.value) : null;
   const chans = (mixQ.rows || []).map(c => ({ name: v3Sentence(String(c.channel || '').replace(/_/g, ' ')), rev: Number(c.net_revenue) || 0 })).filter(c => c.rev > 0).sort((a, b) => b.rev - a.rev);
   const chanTot = chans.reduce((t, c) => t + c.rev, 0), top = chans[0] || null;
