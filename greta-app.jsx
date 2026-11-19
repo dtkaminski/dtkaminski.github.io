@@ -21283,18 +21283,29 @@ const V3_PLAN_PROGRESS_Q = period => (sb, b) => sb.rpc('fn_plan_progress', { p_b
 const V3_PP_MONTH_Q = V3_PLAN_PROGRESS_Q('month'), V3_PP_QUARTER_Q = V3_PLAN_PROGRESS_Q('quarter');
 const V3_PLAN_WORD = { ahead: 'Ahead of plan', on_plan: 'On plan', just_behind: 'Just behind plan', behind: 'Behind plan' };
 const v3PlanTone = st => (st === 'ahead' || st === 'on_plan') ? 'good' : st === 'behind' ? 'bad' : '';
-// How far off Greta's daily sales forecast has been (vw_forecast_error_30d): one muted line beside every
+// How far off the daily sales forecast has been (vw_forecast_error_30d): one muted line beside every
 // forward sales figure, so a projection never reads as surer than the record behind it.
-const V3_FC_ERR_Q = (sb, b) => sb.from('vw_forecast_error_30d').select('metric,model,days,wape,bias,source,label')
+// 1301: the forecast follows the model that was closest on recent usual days; the view names it and scores
+// sale days (sale weeks on the shop's record, calendar promotions) apart from usual days.
+const V3_FC_ERR_Q = (sb, b) => sb.from('vw_forecast_error_30d').select('metric,model,days,wape,bias,source,label,model_name,usual_days,usual_wape,sale_days,sale_wape')
   .eq('brand_id', b).eq('metric', 'revenue').order('days', { ascending: false }).limit(1);
+const v3FcNum = v => v != null && isFinite(Number(v)) ? Number(v) : null;
+// "49% on usual days, 69% on sale days", only when both kinds of day were scored
+function v3FcSplit(r) {
+  const uw = v3FcNum(r.usual_wape), sw = v3FcNum(r.sale_wape);
+  return uw != null && sw != null && Number(r.sale_days) > 0 && Number(r.usual_days) > 0
+    ? fmtPctN(uw) + ' on usual days, ' + fmtPctN(sw) + ' on sale days' : '';
+}
 function V3FcErr() {
   const q = useV3Rows('fc-err', V3_FC_ERR_Q);
   const r = q.rows && q.rows[0];
   if (!r) return null;
-  const w = r.wape != null && isFinite(Number(r.wape)) ? Number(r.wape) : null;
+  const w = v3FcNum(r.wape), split = v3FcSplit(r);
+  const lean = Number(r.bias) > 0 ? ', low on average' : Number(r.bias) < 0 ? ', high on average' : '';
   // too few days to judge on: the view's own sentence says so
   const text = w != null && Number(r.days) >= 14
-    ? 'Daily sales forecast off by about ' + fmtPctN(w) + ' over the last ' + fmtCount(Number(r.days)) + ' days' + (Number(r.bias) > 0 ? ' (low on average).' : Number(r.bias) < 0 ? ' (high on average).' : '.')
+    ? 'Daily sales forecast off by ' + fmtPctN(w) + ' over the last ' + fmtCount(Number(r.days)) + ' days'
+      + (split ? ' (' + split + ')' : '') + lean + '.' + (r.model_name ? ' It follows ' + r.model_name + '.' : '')
     : (r.label || null);
   return text ? <p className="micro muted v3-measure">{text}</p> : null;
 }
@@ -27830,7 +27841,9 @@ function V3CalendarStrip() {
         <V3HomeTile k="Ad spend" v={fmtMoney(A.spend)} dir={overAds ? 'up' : null} cls={overAds ? 'v3-down' : ''} delta={fmtMoney(P.spend) + ' planned by now'}/>
         {!goalOn && Pa && Pa.status && <V3HomeTile k="Profit after ads" v={signed(A.cm)} cls={v3PlanTone(Pa.status) === 'bad' ? 'v3-down' : ''} delta={signed(P.cm) + ' planned by now'}/>}
         {S.plan_total != null && <V3HomeTile k={gpMonthName(M.start) + ' plan'} v={v3GbpRound(S.plan_total)} delta={S.pace_finish != null ? v3GbpRound(S.pace_finish) + ' at today’s pace' : ''} title={[goalOn && Number(TG.goal_sales) > 0 ? 'The plan for your sales goal.' : null, S.pace_basis ? 'At today’s pace: ' + S.pace_basis + '.' : null].filter(Boolean).join(' ') || undefined}/>}
-        {wape != null && <V3HomeTile k="Daily forecast error" v={fmtPctN(wape)} delta={'last ' + fmtCount(Number(Fe.days)) + ' days' + (Number(Fe.bias) > 0 ? ', low on average' : Number(Fe.bias) < 0 ? ', high on average' : '')}/>}
+        {wape != null && <V3HomeTile k="Daily forecast error" v={fmtPctN(wape)}
+          delta={v3FcNum(Fe.usual_wape) != null && Number(Fe.sale_days) > 0 ? fmtPctN(Number(Fe.usual_wape)) + ' on usual days' : 'last ' + fmtCount(Number(Fe.days)) + ' days' + (Number(Fe.bias) > 0 ? ', low on average' : Number(Fe.bias) < 0 ? ', high on average' : '')}
+          title={'Last ' + fmtCount(Number(Fe.days)) + ' days' + (v3FcSplit(Fe) ? ': ' + v3FcSplit(Fe) : '') + (Number(Fe.bias) > 0 ? ', low on average' : Number(Fe.bias) < 0 ? ', high on average' : '') + '.' + (Fe.model_name ? ' The forecast follows ' + Fe.model_name + '.' : '')}/>}
       </div></div>}
     {goalOn && <div className="v3-home-group" style={{ '--n': TG.target != null ? 2 : 1 }}>
       <div className="v3-home-group-h">Goal<span>To {v3Day(TG.counted_through)}</span><b className={'v3-pill ' + (GV.cls === 'good' ? 'v3-pill-good' : GV.cls === 'bad' ? 'v3-pill-bad' : GV.cls === 'warn' ? 'v3-pill-warn' : 'v3-pill-none')}>{GV.word}</b></div>
