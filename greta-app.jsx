@@ -22394,14 +22394,14 @@ function V3StockOffer() {
   const q = useV3Rows('stock-plan', V3_STOCK_Q);
   const lq = useV3Rows('brand-cfg', V3_BCFG_Q);
   const L = v3Lead(lq.rows);
-  const P = useV3Peak(L.days);
+  const P = useV3Peak(L.days, true);   // 21 Nov: a peak under way keeps its lists to its last day
   const figQ = useV3Figures();   // the offer depth (1109)
   // 1289: the peak plan's own two lists, what to lead with and what to keep out of the ads, so this page and the plan
   // name the same products. On 18 Nov this page built its own by product and featured "lower case initial charm"
   // (723 across its letters) while the plan kept its "a / Gold" out of the ads and the order list above said it runs
   // out in 14 days.
   const planQ = useV3Rows('peak-plan-lists', (sb, b) => sb.from('actions')
-    .select('peak:metadata->peak,feature:metadata->on_hand_plan->feature,short:metadata->short')
+    .select('peak:metadata->peak,peak_now:metadata->peak_now,feature:metadata->on_hand_plan->feature,short:metadata->short')
     .eq('brand_id', b).eq('external_id', 'promo-peak-plan').eq('status', 'open').limit(1));
   const pk = P.peak;
   if (!pk || !q.rows || !q.rows.length || !P.ready || (!planQ.rows && !planQ.err)) return null;
@@ -22410,11 +22410,16 @@ function V3StockOffer() {
   const rows = q.rows, num = v => Number(v) || 0, keyOf = t => String(t || '').trim().toLowerCase();
   const lead = rows.find(r => r.lead_days != null) ? num(rows.find(r => r.lead_days != null).lead_days) : L.days;
   const land = v3IsoAdd(todayIso, lead);
-  if (pk.start <= todayIso || land <= pk.start) return null;   // an order can still land in time: the list above covers it
+  // 21 Nov eval: the lists went at the peak's start (frkl, day 2 of 11, with 5 best sellers running short). While it
+  // runs, what to feature and what to keep out of the ads still holds; the stock is today's count.
+  const uw = pk.start <= todayIso;
+  const dayNo = uw ? Math.round((new Date(todayIso) - new Date(pk.start)) / 864e5) + 1 : null;
+  if (!uw && land <= pk.start) return null;   // an order can still land in time: the list above covers it
+  const kick = uw ? pkName + ', day ' + fmtCount(dayNo) + ' of ' + fmtCount(pk.days) : 'Your next busy period, ' + pkName + ', ' + v3Day(pk.start) + ' – ' + v3Day(pk.end, true);
   // 19 Nov eval: with only the actions read failed, this page built its own lists (6 and 6 against the plan's 3 and 4)
   // and said nothing. A failed read of the plan says so; the page's own lists are only for a brand with no plan.
   if (planQ.err) return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">Your next busy period, {pkName}, {v3Day(pk.start)} – {v3Day(pk.end, true)}</div>
+    <div className="v3-kick">{kick}</div>
     <V3LoadFailed what="The peak plan’s product lists" onRetry={planQ.retry}/>
   </section></div>);
   // the sea order lands after the peak; until the week before it starts, stock can still come sooner (the plan's air step)
@@ -22423,15 +22428,21 @@ function V3StockOffer() {
     const o = T[t] || (T[t] = { title: r.product_title, oh: 0, v: 0 }); o.oh += Math.max(0, num(r.on_hand)); o.v += num(r.weekly_velocity); });
   const V = {}; rows.forEach(r => { const t = keyOf(r.product_title); if (t) V[t] = (V[t] || 0) + num(r.weekly_velocity); });
   const PU = v3PeakUnits(P.ly, Object.keys(T), P.prods);
-  const M = planQ.rows && planQ.rows[0], mp = M && M.peak;
+  // while the peak runs the plan row carries it as peak_now (peak is the next one, null mid-peak)
+  const M = planQ.rows && planQ.rows[0], mp = M && (uw ? M.peak_now || M.peak : M.peak || M.peak_now);
   const fromPlan = !!(mp && mp.title === pk.title && String(mp.start || '').slice(0, 10) === pk.start
     && Array.isArray(M.feature) && Array.isArray(M.short) && (M.feature.length || M.short.length));
   let plenty, short;
   if (fromPlan) {
     // the plan's figures as its steps say them: stock at the start against last year's peak units; a short one's
     // stock is last year's units less what it is short by ("stock for about 15 of the 68 it sold last year")
-    plenty = M.feature.map(f => ({ title: v3Sentence(f.title), ly: num(f.ly_units), left: Math.max(0, Math.round(num(f.at_start))) }));
-    short = M.short.map(s => ({ title: v3Sentence(s.title), ly: num(s.ly_units), left: Math.max(0, Math.round(num(s.ly_units) - Math.max(0, num(s.short)))),
+    // While the peak runs the column is today's stock: a whole product's from the stock list, a variant's (one letter
+    // of a charm) from the plan's own count, as the stock list adds variants up by product
+    const now = (it) => { const k = keyOf(it.product || it.title), whole = keyOf(it.title) === k;
+      if (whole && T[k]) return Math.round(T[k].oh);
+      return it.on_hand != null ? Math.max(0, Math.round(num(it.on_hand))) : null; };
+    plenty = M.feature.map(f => ({ title: v3Sentence(f.title), ly: num(f.ly_units), left: uw ? now(f) : Math.max(0, Math.round(num(f.at_start))) }));
+    short = M.short.map(s => ({ title: v3Sentence(s.title), ly: num(s.ly_units), left: uw ? now(s) : Math.max(0, Math.round(num(s.ly_units) - Math.max(0, num(s.short)))),
       onOrder: (V[keyOf(s.product || s.title)] || 0) > 0 }));
   } else {
     const items = Object.values(PU).filter(p => !p.title.startsWith('#')).map(p => {
@@ -22448,18 +22459,18 @@ function V3StockOffer() {
   // on a phone the restock date sits under the name, so the name keeps whole words (18 Nov: "bracele/t" in a 61px
   // column beside a 170px "Not on order, out for weeks")
   const tbl = (list, last) => (<table className="v3-rw v3-pk-tbl">
-    <thead><tr><th className="t-text">Product</th><th>Sold in last year’s peak</th><th>Left when it starts</th>{last && <th className="t-text v3-pk-rs">Restock arrives</th>}</tr></thead>
+    <thead><tr><th className="t-text">Product</th><th>Sold in last year’s peak</th><th>{uw ? 'In stock now' : 'Left when it starts'}</th>{last && <th className="t-text v3-pk-rs">Restock arrives</th>}</tr></thead>
     <tbody>{list.map(x => { const rs = x.onOrder ? v3Day(land) : 'Not on order, out for weeks';
       return (<tr key={x.title}>
       <td className="t-text v3-rw-name">{x.title}{x.renamed ? <span className="v3-pk-was">{' (was “' + x.renamed + '”)'}</span> : null}
         {last && <span className="v3-pk-rs-in">{x.onOrder ? 'Restock arrives ' + rs.replace(/ /g, ' ') : rs}</span>}</td>
       <td>{fmtCount(x.ly)}</td>
-      <td className={x.left < x.ly ? 'v3-down' : ''}>{fmtCount(x.left)}</td>
+      <td className={x.left != null && x.left < x.ly ? 'v3-down' : ''}>{x.left != null ? fmtCount(x.left) : '–'}</td>
       {last && <td className="t-text v3-muted v3-pk-rs">{rs}</td>}
     </tr>); })}</tbody>
   </table>);
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">Your next busy period, {pkName}, {v3Day(pk.start)} – {v3Day(pk.end, true)}</div>
+    <div className="v3-kick">{kick}</div>
     <p className="v3-verdict">For {pkName}, feature what you have plenty of. Keep products that will run short out of your ads.</p>
     {/* How deep to go (review, 9 Oct: Greta said run a peak offer but never how much off). From the brand's
         own margin after product and order costs: at d off full price, £100 of full-price sales keeps
@@ -22471,8 +22482,10 @@ function V3StockOffer() {
       return <p className="v3-note v3-measure"><b>How deep to go.</b> After product and order costs you keep about {v3About(k0)} of every £100 you sell at full price.
         {' '}At 20% off you keep {fmtMoney(k20)}{half !== 20 ? <>; at {half}% off, {fmtMoney(kCap)}, about half</> : <>, about half</>}; at 45% off, {fmtMoney(k45)}. Codes also go to people who would have bought anyway, so keep the offer at or under {half}% off and put it on what you have plenty of, below.
         {' '}<V3Conf state="likely" detail="Your margin after product and order costs over the last 30 days, applied to full-price sales. It leaves out the extra orders a deeper offer brings, which have to make up the difference."/></p>; })()}
-    <p className="v3-note v3-measure">The same {fmtCount(pk.days)} days last year sold {fmtMoney(pk.lySales)}, {v3Dp1Num(Number(pk.ratio))}× your normal pace. The order above arrives on {v3Day(land)}, {afterEnd ? (canSooner ? 'after it ends, so the peak runs on what is in stock and what a supplier can send by ' + v3Day(inBy) : 'after it ends, so the whole peak runs on what is in stock') : 'after it starts, so until then you can only sell what is in stock'}. Featuring what you have plenty of sells stock you have already paid for. Advertising what will run short sells it out early, and then you pay for clicks on a sold-out page.
-      {' '}<V3Conf state="probably" detail="Based on units sold on the same days last year, at last year’s prices and offers. A bigger or smaller offer this year changes demand to match. Stock left assumes today’s pace until the peak starts."/></p>
+    <p className="v3-note v3-measure">The same {fmtCount(pk.days)} days last year sold {fmtMoney(pk.lySales)}, {v3Dp1Num(Number(pk.ratio))}× your normal pace. The order above arrives on {v3Day(land)}, {uw
+        ? (afterEnd ? 'after it ends, so the rest of the peak runs on what is in stock' : 'before it ends; until then you can only sell what is in stock')
+        : afterEnd ? (canSooner ? 'after it ends, so the peak runs on what is in stock and what a supplier can send by ' + v3Day(inBy) : 'after it ends, so the whole peak runs on what is in stock') : 'after it starts, so until then you can only sell what is in stock'}. Featuring what you have plenty of sells stock you have already paid for. Advertising what will run short sells it out early, and then you pay for clicks on a sold-out page.
+      {' '}<V3Conf state="probably" detail={'Based on units sold on the same days last year, at last year’s prices and offers. A bigger or smaller offer this year changes demand to match. ' + (uw ? 'Stock is today’s count.' : 'Stock left assumes today’s pace until the peak starts.')}/></p>
     {plenty.length > 0 && <><h2 className="v3-sec-title">Feature these in the offer</h2>{tbl(plenty, false)}</>}
     {short.length > 0 && <><h2 className="v3-sec-title">{afterEnd ? 'Keep these out of your ads once they run low' : 'Keep these out of your ads until the order arrives'}</h2>{tbl(short, true)}</>}
     {gone.length > 0 && <p className="micro muted v3-measure">{gone.length === 1 ? 'One of last year’s peak sellers is' : fmtCount(gone.length) + ' of last year’s peak sellers are'} no longer sold: {gone.slice(0, 4).map(p => v3Sentence(p.from)).join(', ')}{gone.length > 4 ? ' and others' : ''}.</p>}
@@ -25093,13 +25106,18 @@ function useV3PeakDeadline(start, leadDays) {
   const ld = Number(leadDays);   // the lead time can still be loading
   return { start: s, deadline: d, orderBy: leadDays != null && Number.isFinite(ld) ? v3IsoAdd(d, -Math.round(ld)) : null };
 }
-function useV3Peak(leadDays) {
+function useV3Peak(leadDays, underWay) {
   const today = new Date().toISOString().slice(0, 10);
-  const cal = useV3Rows('stock-cal', (sb, b) => sb.from('vw_calendar_grid').select('title,start_date,end_date,row_group')
+  const cal = useV3Rows(underWay ? 'stock-cal-uw' : 'stock-cal', (sb, b) => {
     // 18 Nov: to the day before the peak. From 7 days out the page dropped it, and with it what to feature, what to keep
     // out of the ads and how deep to go, in the week those matter most (frkl, 13 to 19 Nov). The order list's own peak
     // stops a week out, when peak stock should be in (fn_peak_stock_deadline).
-    .eq('brand_id', b).eq('row_group', 'seasonality').gte('start_date', v3IsoAdd(today, 1)).lte('start_date', v3IsoAdd(today, 120)).limit(200));
+    // 21 Nov eval: from its first day the peak dropped out of this read, so its lists went with it while the peak ran
+    // (frkl, day 2 of 11). With underWay a peak still running counts too (Stock & orders' offer panel only).
+    const c = sb.from('vw_calendar_grid').select('title,start_date,end_date,row_group').eq('brand_id', b).eq('row_group', 'seasonality');
+    return (underWay ? c.gte('end_date', today).gte('start_date', v3IsoAdd(today, -35)) : c.gte('start_date', v3IsoAdd(today, 1)))
+      .lte('start_date', v3IsoAdd(today, 120)).limit(200);
+  });
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   const stP = useV3Rows('brand-state', V3_STATE_Q);   // the peak's pace, as the plan and the Calendar give it
   // product status, so last year's sellers that are archived read "no longer sold", not "missing"
