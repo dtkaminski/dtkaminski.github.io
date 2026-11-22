@@ -19162,7 +19162,7 @@ function V3MorningAlerts() {
     <p className="v3-goal-lab">This morning</p>
     <ul>{peak && <li key="peak" className="v3-ma-line v3-ma-peak">
       <b>{v3PlainWords(peak.title)}</b>{pkUw
-        ? <> is under way: day {fmtCount(Number(peak.day_no))} of {fmtCount(Number(peak.days))}, {fmtCount(Number(peak.days_left))} {Number(peak.days_left) === 1 ? 'day' : 'days'} left.</>
+        ? <> is under way: day {fmtCount(Number(peak.day_no))} of {fmtCount(Number(peak.days))}, {fmtCount(Number(peak.days_left))} {Number(peak.days_left) === 1 ? 'day' : 'days'} left.{peak.said ? ' ' + peak.said : ''}</>
         : <> starts {when(pkIn, String(peak.start).slice(0, 10))}.</>}
       {pkPlan && <>{pkPlan.taken_on ? '' : ' Nobody has taken its plan on yet.'}{' '}<button type="button" className="v3-xref" onClick={go}>Open the plan</button></>}
     </li>}
@@ -27611,7 +27611,7 @@ function V3BusinessState({ part }) {
   if (S.peak_now && S.peak_now.title)
     items.push({ k: 'Your busy period',
       // 1305: the finished days against the same days last year (state.peak_now.so_far, ly_so_far)
-      t: <>{v3PlainWords(S.peak_now.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '')} is under way: day {fmtCount(num(S.peak_now.day_no))} of {fmtCount(num(S.peak_now.days))}. {num(S.peak_now.days_done) > 0 && S.peak_now.so_far != null && num(S.peak_now.ly_so_far) > 0
+      t: <>{v3PlainWords(S.peak_now.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '')} is under way: day {fmtCount(num(S.peak_now.day_no))} of {fmtCount(num(S.peak_now.days))}. {S.peak_now.said ? S.peak_now.said : num(S.peak_now.days_done) > 0 && S.peak_now.so_far != null && num(S.peak_now.ly_so_far) > 0
         ? <>The first {num(S.peak_now.days_done) === 1 ? 'day' : fmtCount(num(S.peak_now.days_done)) + ' days'} sold {fmtMoney(num(S.peak_now.so_far))}, against {fmtMoney(num(S.peak_now.ly_so_far))} on the same {num(S.peak_now.days_done) === 1 ? 'day' : 'days'} last year. All {fmtCount(num(S.peak_now.days))} days last year sold {fmtMoney(num(S.peak_now.ly_sales))}.</>
         : <>The same days last year sold {fmtMoney(num(S.peak_now.ly_sales))}.</>}</> });
   if (P && P.title)
@@ -27702,7 +27702,9 @@ function V3BusinessState({ part }) {
     // 18 Nov: the week and the day count goods only (the weekly ladder); the 30 days' Sales carries delivery too
     const weekly = hasStats ? [['Product sales', TW.sales, TW.prev_sales, true, 'sales'], ['Ad spend', TW.ads, TW.prev_ads, null, 'ads'], ['Profit after ads', TW.profit_after_ads, TW.prev_profit_after_ads, true, 'v']] : [];
     // 9 Nov eval: a reason to open Home each morning. The latest closed day, each figure against a typical same weekday.
-    const Y = yq.rows && yq.rows[0], YT = Y && Y.typical;
+    // 1316: a day inside a peak reads against the same day last year (fn_brand_yesterday: peak, last_year), as a
+    // typical Saturday is no yardstick for Black Friday's second day
+    const Y = yq.rows && yq.rows[0], YL = Y && Y.peak && Y.last_year ? Y.last_year : null, YT = YL || (Y && Y.typical);
     const daily = Y && Y.sales != null ? [['Product sales', Y.sales, YT && YT.sales, true, 'sales', fmtMoney],
       ['Orders', Y.orders, YT && YT.orders, true, 'orders', fmtCount],
       ...(Number(Y.ads) > 0 || (YT && Number(YT.ads) > 0) ? [['Ad spend', Y.ads, YT && YT.ads, null, 'ads', fmtMoney]] : []),
@@ -27710,7 +27712,7 @@ function V3BusinessState({ part }) {
     const daySer = k => (Y && Array.isArray(Y.series) ? Y.series : []).map(d => d[k]).filter(x => x != null);
     return (<section className="v3-panel v3-home-strip" aria-label="Key figures">
       {daily.length > 0 && <div className="v3-home-group v3-home-day" style={{ '--n': daily.length }}>
-        <div className="v3-home-group-h">{Y.is_yesterday ? 'Yesterday' : Y.weekday}<span>{v3Day(Y.day)}{Y.is_yesterday ? '' : ', the latest day with data'}{YT ? ', against a typical ' + Y.weekday : ''}</span></div>
+        <div className="v3-home-group-h">{Y.is_yesterday ? 'Yesterday' : Y.weekday}<span>{v3Day(Y.day)}{Y.is_yesterday ? '' : ', the latest day with data'}{YL ? ', day ' + fmtCount(Number(Y.peak.day_no)) + ' of ' + v3PlainWords(Y.peak.title) + ', against the same day last year' : YT ? ', against a typical ' + Y.weekday : ''}</span></div>
         <div className="v3-home-tiles">{daily.map(([k, v, was, up, key, fmt]) => {
           const { dir, delta, title } = v3TileDelta(v, was, fmt);
           return <V3HomeTile key={k} k={k} v={fmt(v)} dir={dir} cls={up == null || !dir || dir === 'flat' ? '' : (dir === 'up') === up ? 'v3-up' : 'v3-down'}
@@ -27958,6 +27960,11 @@ function V3CalendarStrip() {
   const Pk = stQ.rows && stQ.rows[0] && (stQ.rows[0].peak_now || stQ.rows[0].peak);
   const pkDays = Pk && Pk.days_away != null ? Number(Pk.days_away) : null;
   const pkLy = Pk && Number(Pk.ly_sales) > 0 ? Number(Pk.ly_sales) : null;
+  // 1316: under way, the days done against their forecast (made before the peak) and the days left, rounded
+  const pkUw = !!(Pk && Pk.days_left != null);
+  const pkSo = pkUw && Number(Pk.days_done) > 0 && Pk.so_far != null && Number(Pk.forecast_so_far) > 0 ? Number(Pk.vs_forecast) : null;
+  const pkRest = pkUw && Number(Pk.forecast_rest_about) > 0 ? Number(Pk.forecast_rest_about) : null;
+  const pkN = 1 + (pkLy != null ? 1 : 0) + (pkSo != null ? 1 : 0) + (pkRest != null ? 1 : 0);
   const nMonth = hasMonth ? 2 + (S.plan_total != null ? 1 : 0) + (wape != null ? 1 : 0) + (!goalOn && Pa && Pa.status ? 1 : 0) : 0;
   const loading = !q.rows && !q.err && !Pk && !TG;
   if (loading) return <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures"><div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div></section>;
@@ -27982,12 +27989,17 @@ function V3CalendarStrip() {
         <V3HomeTile k="Profit after ads" v={(Number(TG.so_far) < 0 ? '−' : '') + v3Gbp(Math.abs(Number(TG.so_far)))} dir={GV.ahead >= 0 ? 'up' : 'down'} cls={GV.ahead >= 0 ? 'v3-up' : 'v3-down'} delta={v3Gbp(Math.abs(GV.ahead)) + (GV.ahead >= 0 ? ' ahead of goal' : ' behind goal')}/>
         {TG.target != null && <V3HomeTile k="Target" v={v3GbpRound(TG.target)} delta={'by ' + v3Day(TG.period_end)}/>}
       </div></div>}
-    {Pk && <div className="v3-home-group" style={{ '--n': pkLy != null ? 2 : 1 }}>
+    {Pk && <div className="v3-home-group" style={{ '--n': pkN }}>
       <div className="v3-home-group-h">{Pk.title || 'Next peak'}<span>{v3Day(String(Pk.start).slice(0, 10))} – {v3Day(String(Pk.end).slice(0, 10))}</span></div>
       <div className="v3-home-tiles">
         {Pk.days_left != null
           ? <V3HomeTile k="Under way" v={'Day ' + fmtCount(Number(Pk.day_no)) + ' of ' + fmtCount(Number(Pk.days))} delta={fmtCount(Number(Pk.days_left)) + (Number(Pk.days_left) === 1 ? ' day left' : ' days left')}/>
           : <V3HomeTile k="Starts in" v={pkDays > 0 ? fmtCount(pkDays) + (pkDays === 1 ? ' day' : ' days') : 'Under way'} delta={v3Day(String(Pk.start).slice(0, 10))}/>}
+        {pkSo != null && <V3HomeTile k={Number(Pk.days_done) === 1 ? 'First day' : 'First ' + fmtCount(Number(Pk.days_done)) + ' days'} v={fmtMoney(Number(Pk.so_far))}
+          dir={pkSo < 0.9 ? 'down' : pkSo > 1.1 ? 'up' : 'flat'} cls={pkSo < 0.9 ? 'v3-down' : pkSo > 1.1 ? 'v3-up' : ''}
+          delta={fmtPctN(pkSo) + ' of forecast'} title={Pk.said || ''}/>}
+        {pkRest != null && <V3HomeTile k="Days left, forecast" v={v3GbpRound(pkRest)}
+          delta={Number(Pk.ly_rest) > 0 ? fmtMoney(Number(Pk.ly_rest)) + ' last year' : ''} title={Pk.forecast_basis || ''}/>}
         {pkLy != null && <V3HomeTile k="Same days last year" v={fmtMoney(pkLy)} delta={Number(Pk.ratio) > 0 ? v3Dp1Num(Number(Pk.ratio)) + '× a normal pace' : ''}/>}
       </div></div>}
     {open && hasMonth && <div className="v3-home-drv v3-goal-full"><V3DriverPanel fixed={v3ModelCalendar(A, P, { range, month: gpMonthName(M.start), goal: goalOn })}/></div>}
@@ -29438,12 +29450,14 @@ function V3PeakFirst({ peak }) {
   const ly = Number(peak.ly_orders) > 0 && Number(peak.ly_sales) > 0
     ? ' Last year it brought ' + fmtCount(Number(peak.ly_orders)) + ' orders and ' + fmtMoney(Number(peak.ly_sales))
       + (Number(peak.ratio) > 0 ? ', at ' + fmtTimes(Number(peak.ratio), 1) + ' your usual pace' : '') + '.' : '';
+  // 1316: under way, the days so far against their forecast and last year, and the days left (state.peak_now.said)
+  const said = peak.uw && peak.said ? ' ' + peak.said : null;
   const go = () => window.__oiGo && window.__oiGo('goal', null, 'promo-peak-plan');
   return (<section className="v3-sec" aria-label="Peak">
     <div className="v3-kick">Peak</div>
     <p className="v3-note v3-measure v3-peak-lead"><b>{v3PlainWords(peak.title)} {peak.uw
         ? <>is under way: day {fmtCount(Number(peak.day_no))} of {fmtCount(Number(peak.days))}, {fmtCount(Number(peak.days_left))} {Number(peak.days_left) === 1 ? 'day' : 'days'} left.</>
-        : <>starts {when}.</>}</b>{ly}{lev && !lev.taken_on ? ' Nobody has taken its plan on yet.' : ''}{' '}
+        : <>starts {when}.</>}</b>{said || ly}{lev && !lev.taken_on ? ' Nobody has taken its plan on yet.' : ''}{' '}
       <button type="button" className="v3-xref" onClick={go}>Open the plan</button></p>
     <V3MoveDecide row={row} small/>
   </section>);
