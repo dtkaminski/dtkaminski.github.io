@@ -22073,11 +22073,19 @@ function V3Growth() {
       + (reworked ? '. ' + reworked : '')
     : tgt ? 'On the plan for your sales goal' + (gkMo ? ', with ' + v3GbpRound(gkMo.spend) + ' of ads' : '')
     : (PL && (PL.flags || []).indexOf('held_at_first_order_profit') >= 0) ? 'At the plan’s budget' : A ? 'With ' + v3AdsNear(A) : '';
+  // 1330: renewals due, the part of the next 30 days' forecast that is already scheduled (brands with subscriptions only)
+  const subsH = useV3Rows('subs-history', V3_SUBS_HIST_Q);
+  const subsF = (subsH.rows && subsH.rows[0] && subsH.rows[0].history && subsH.rows[0].history.figures) || {};
+  const dueF = subsF.subs_due_30d && subsF.subs_due_30d.value != null && /^(measured|estimated)$/.test(subsF.subs_due_30d.state || '') ? subsF.subs_due_30d : null;
+  const duePounds = dueF ? (/\u00a3[\d,]+/.exec(String(dueF.display || '')) || [null])[0] : null;
+  const dueShare = subsF.subs_forecast_share && subsF.subs_forecast_share.value != null ? Number(subsF.subs_forecast_share.value) : null;
   const monthRows = planMo && mtd != null && daysDone >= 3 ? [
     { k: 'Sales so far', v: fmtMoney(mtd), b: V3_PLAN_WORD[planMo.status] + ': ' + v3GbpRound(planMo.expected_by_now) + ' expected by now', cls: v3PlanTone(planMo.status) === 'bad' ? 'v3-down' : '' },
     planMo.pace_finish != null && { k: 'At today’s pace', v: v3GbpRound(planMo.pace_finish), b: 'Your average day over the last 30 days (' + fmtMoney(planMo.pace_per_day) + ') for the ' + fmtCount(MP.days_left) + ' days left' },
     { k: 'Plan', v: v3GbpRound(planMo.plan_total), b: planBasis },
     fcOk && { k: 'Forecast, ' + v3Day(fc.forecast_covers_from) + ' to ' + v3Day(fc.forecast_covers_to), v: v3GbpRound(fc.forecast_revenue_period), b: 'The plan says ' + v3GbpRound(planWin) + ' for those days' },
+    dueF && duePounds && { k: 'Renewals due, next 30 days', v: duePounds, b: fmtCount(dueF.value) + ' subscription renewals already scheduled'
+      + (dueShare != null && dueShare > 0 ? ', ' + Math.round(dueShare * 100) + '% of the sales forecast for those days' : '') },
   ].filter(Boolean) : [];
 
   const cacTip = ({ active, payload }) => (!active || !payload || !payload.length) ? null : (<div className="v3-tip"><b>{v3Month(payload[0].payload.month, 'long')}</b>
@@ -22209,6 +22217,30 @@ function v3Cover(weeks) {
   if (w >= 9) return 'about ' + Math.round(w / 4.345) + ' months';
   return Math.round(w) + ' weeks';
 }
+// 1330: units due to go out on subscription renewals in the next 30 days, beside each product's stock. Brands with
+// subscriptions only; nothing renders without rows (or before fn_subs_due_products is live).
+const V3_SUBS_DUEP_Q = (sb, b) => sb.rpc('fn_subs_due_products', { p_brand: b });
+function V3StockRenewals() {
+  const q = useV3Rows('subs-due-products', V3_SUBS_DUEP_Q);
+  const rows = (q.rows || []).filter(r => r && Number(r.renewal_units_30d) >= 1);
+  if (q.err || !rows.length) return null;
+  const anyShort = rows.some(r => Number(r.short_units) > 0);
+  return (<section className="v3-sec" aria-label="Renewals due">
+    <h2 className="v3-sec-title">Renewals due</h2>
+    <table className="v3-rw v3-slow">
+      <thead><tr><th className="t-text">Product</th><th>In stock</th><th>Due on renewals, 30 days</th><th>Sells a week</th><th>Share on renewals</th>{anyShort && <th>Short</th>}</tr></thead>
+      <tbody>{rows.slice(0, 12).map(r => (<tr key={r.sku}>
+        <td className="t-text v3-rw-name" title={r.sku}>{v3Sentence(r.product_title || r.sku)}</td>
+        <td>{fmtCount(r.on_hand)}</td>
+        <td>{fmtCount(r.renewal_units_30d)}</td>
+        <td>{Number(r.weekly_velocity) >= 1 ? fmtCount(Math.round(Number(r.weekly_velocity))) : Number(r.weekly_velocity || 0).toFixed(1)}</td>
+        <td>{r.renewal_share != null ? Math.round(Number(r.renewal_share) * 100) + '%' : FMT_NONE}</td>
+        {anyShort && <td className={Number(r.short_units) > 0 ? 'v3-down' : ''}>{Number(r.short_units) > 0 ? fmtCount(r.short_units) : FMT_NONE}</td>}
+      </tr>))}</tbody>
+    </table>
+  </section>);
+}
+
 function V3Stock() {
   const q = useV3Rows('stock-plan', V3_STOCK_Q);   // cover, slow stock and tidy-up; the order list is below
   const lq2 = useV3Rows('stock-list', V3_STOCK_LIST_Q);
@@ -30233,6 +30265,8 @@ const V3_PAGES = {
         where cash is sitting. The browser-side planner and the full table sit behind it. */}
     <V3Stock/>
     <V3StockOffer/>
+    {/* 1330: units due on subscription renewals beside each product's stock; brands with subscriptions only */}
+    <V3StockRenewals/>
     {/* The planner reads live stock (vw_sku_stock_cover) for every brand since 2026-10-02. A third
         per-product list, the marketing-os "Every product" table, with its own status bands, sat
         here too and could disagree with both; removed. */}
