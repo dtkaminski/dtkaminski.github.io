@@ -387,6 +387,30 @@
   </div>
 </div>
 
+<!-- Skio API-token modal (1327) -->
+<div id="skio-modal" class="modal-bg" hidden>
+  <div class="modal">
+    <h3>Connect Skio</h3>
+    <p class="lead" style="font-size:13px; margin:8px 0 14px;">
+      Paste an <b style="color:var(--text-primary);">API token</b> from your Skio dashboard:
+    </p>
+    <ol style="font-size:12.5px; color:var(--text-secondary); margin:0 0 14px; padding-left:18px; line-height:1.7;">
+      <li>In Skio, click <b style="color:var(--text-primary);">API</b> in the left navigation</li>
+      <li>Name the token “Greta” and click <b style="color:var(--text-primary);">Generate</b></li>
+      <li>Copy it straight away: Skio shows it once. Paste it below</li>
+    </ol>
+    <label>API token
+      <input type="text" id="skio-key-input" autocomplete="off" spellcheck="false" style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px;"/>
+    </label>
+    <p class="meta" style="margin-top:var(--s-2); font-size:11px;">Greta only reads your subscriptions and never changes one. The token is stored encrypted.</p>
+    <div id="skio-error" class="error-box" hidden style="margin-top: 12px;"></div>
+    <div class="row" style="margin-top: 16px;">
+      <button id="skio-submit" class="btn-primary">Connect</button>
+      <button id="skio-cancel" class="btn-ghost" style="margin-left:auto;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Recharge API-token modal (1326) -->
 <div id="recharge-modal" class="modal-bg" hidden>
   <div class="modal">
@@ -495,6 +519,10 @@
       unlocks:'Sessions, funnel drop-off, channel mix, on-site conversions',
       buildInstallUrl: (b) => `${SUPABASE_FNS}/oauth-ga4-install?brand=${encodeURIComponent(b)}`,
       promptType:'direct' },
+    // Skio (1327, 24 Nov 2026): an API token the owner pastes; subscriptions, pauses and failing payments.
+    { id:'skio', name:'Skio', icon:'S', required:false, authType:'api_key',
+      unlocks:'Active and paused subscriptions, cancellations, failing renewal payments, renewals due',
+      promptType:'skio_token' },
     // Recharge (1326, 24 Nov 2026): a read-only API token the owner pastes; subscriptions and renewal charges.
     { id:'recharge', name:'Recharge', icon:'R', required:false, authType:'api_key',
       unlocks:'Active subscriptions, cancellations and their reasons, failed renewal payments, renewals due',
@@ -761,6 +789,7 @@
         else if (spec.promptType === 'api_key') openKlaviyoModal();
         else if (spec.promptType === 'clarity_key') openClarityModal();
         else if (spec.promptType === 'recharge_token') openRechargeModal();
+        else if (spec.promptType === 'skio_token') openSkioModal();
         else if (spec.promptType === 'direct') {
           // Direct OAuth — go through the authenticated connect-start endpoint
           // (validates brand ownership + stamps the initiator) then redirect.
@@ -934,6 +963,56 @@
       klaviyoError.hidden = false;
       klaviyoSubmit.disabled = false;
       klaviyoSubmit.textContent = 'Connect';
+    }
+  });
+
+  // ── Skio modal (1327) ────────────────────────────────────────────────────
+  const skioModal = document.getElementById('skio-modal');
+  const skioKeyInput = document.getElementById('skio-key-input');
+  const skioError = document.getElementById('skio-error');
+  const skioSubmit = document.getElementById('skio-submit');
+
+  function openSkioModal() {
+    skioModal.hidden = false;
+    skioKeyInput.value = '';
+    skioError.hidden = true;
+    skioSubmit.disabled = false;
+    skioSubmit.textContent = 'Connect';
+    setTimeout(() => skioKeyInput.focus(), 50);
+  }
+  document.getElementById('skio-cancel').addEventListener('click', () => { skioModal.hidden = true; });
+  skioModal.addEventListener('click', (e) => { if (e.target === skioModal) skioModal.hidden = true; });
+  skioSubmit.addEventListener('click', async () => {
+    const key = skioKeyInput.value.trim();
+    if (key.length < 10 || /\s/.test(key)) {
+      skioError.textContent = 'Paste the whole token, with no spaces.';
+      skioError.hidden = false;
+      return;
+    }
+    skioSubmit.disabled = true;
+    skioSubmit.textContent = 'Checking…';
+    skioError.hidden = true;
+    try {
+      const resp = await fetch(`${SUPABASE_FNS}/skio-connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+        body: JSON.stringify({ brand: currentBrand.slug, api_token: key }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        skioError.textContent = data.message || data.error || 'Failed to connect.';
+        skioError.hidden = false;
+        skioSubmit.disabled = false;
+        skioSubmit.textContent = 'Connect';
+        return;
+      }
+      skioModal.hidden = true;
+      window.location.reload();
+    } catch (e) {
+      skioError.textContent = `Network error: ${e.message || e}`;
+      skioError.hidden = false;
+      skioSubmit.disabled = false;
+      skioSubmit.textContent = 'Connect';
     }
   });
 

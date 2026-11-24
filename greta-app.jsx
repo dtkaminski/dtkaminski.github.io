@@ -15257,7 +15257,7 @@ const MOBILE_NAV = [
 // The button therefore belongs next to the sentence, not three screens away from it.
 const CONN_LABEL = {
   meta: 'Meta', google_ads: 'Google Ads', ga4: 'Google Analytics',
-  shopify: 'Shopify', klaviyo: 'Klaviyo', instagram: 'Instagram', tiktok_ads: 'TikTok Ads', recharge: 'Recharge',
+  shopify: 'Shopify', klaviyo: 'Klaviyo', instagram: 'Instagram', tiktok_ads: 'TikTok Ads', recharge: 'Recharge', skio: 'Skio',
 };
 // Only what connect-start can actually start on its own. Klaviyo is an API key and
 // Instagram arrives attached to Meta; a one-click button on either would be a button
@@ -15580,6 +15580,13 @@ function ConnectionsPanel(){
       id: 'tiktok_ads', name: 'TikTok Ads', icon: 'T', provider: 'tiktok_ads',
       description: 'Spend, clicks and the conversions TikTok claims',
       last: ttLast.rows && ttLast.rows[0] ? String(ttLast.rows[0].date).slice(0, 10) : null,
+      installable: false,
+    }] : []),
+    // 1327: Skio, as Recharge below
+    ...(LIVE_CONNS.some(x => x.provider === 'skio') ? [{
+      id: 'skio', name: 'Skio', icon: 'S', provider: 'skio',
+      description: 'Subscriptions, pauses, cancellations, failing renewal payments, renewals due',
+      last: (() => { const c = LIVE_CONNS.find(x => x.provider === 'skio'); return c && c.last_sync_at ? String(c.last_sync_at).slice(0, 10) : null; })(),
       installable: false,
     }] : []),
     // 1326: listed when connected, as TikTok is. It connects with an API token on the workspace page.
