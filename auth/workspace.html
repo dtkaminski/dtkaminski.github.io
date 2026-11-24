@@ -387,6 +387,31 @@
   </div>
 </div>
 
+<!-- Recharge API-token modal (1326) -->
+<div id="recharge-modal" class="modal-bg" hidden>
+  <div class="modal">
+    <h3>Connect Recharge</h3>
+    <p class="lead" style="font-size:13px; margin:8px 0 14px;">
+      Paste a <b style="color:var(--text-primary);">read-only API token</b> from your Recharge admin:
+    </p>
+    <ol style="font-size:12.5px; color:var(--text-secondary); margin:0 0 14px; padding-left:18px; line-height:1.7;">
+      <li>In Recharge, open <b style="color:var(--text-primary);">Tools &amp; apps</b>, then <b style="color:var(--text-primary);">API tokens</b></li>
+      <li>Create a token named “Greta”</li>
+      <li>Give it <b style="color:var(--text-primary);">Read access</b> to Subscriptions, Customers and Orders, and nothing else</li>
+      <li>Copy the token and paste it below</li>
+    </ol>
+    <label>API token
+      <input type="text" id="recharge-key-input" autocomplete="off" spellcheck="false" style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px;"/>
+    </label>
+    <p class="meta" style="margin-top:var(--s-2); font-size:11px;">Read-only. Greta never changes a subscription or a charge. The token is stored encrypted.</p>
+    <div id="recharge-error" class="error-box" hidden style="margin-top: 12px;"></div>
+    <div class="row" style="margin-top: 16px;">
+      <button id="recharge-submit" class="btn-primary">Connect</button>
+      <button id="recharge-cancel" class="btn-ghost" style="margin-left:auto;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Klaviyo API-key modal -->
 <div id="klaviyo-modal" class="modal-bg" hidden>
   <div class="modal">
@@ -470,6 +495,10 @@
       unlocks:'Sessions, funnel drop-off, channel mix, on-site conversions',
       buildInstallUrl: (b) => `${SUPABASE_FNS}/oauth-ga4-install?brand=${encodeURIComponent(b)}`,
       promptType:'direct' },
+    // Recharge (1326, 24 Nov 2026): a read-only API token the owner pastes; subscriptions and renewal charges.
+    { id:'recharge', name:'Recharge', icon:'R', required:false, authType:'api_key',
+      unlocks:'Active subscriptions, cancellations and their reasons, failed renewal payments, renewals due',
+      promptType:'recharge_token' },
     // Clarity (0445, 12 Oct 2026): a Data Export token the owner pastes; read-only aggregates.
     { id:'clarity', name:'Microsoft Clarity', icon:'C', required:false, authType:'api_key',
       unlocks:'Where shoppers get stuck on your site: rage and dead clicks, script errors, scroll depth, devices',
@@ -731,6 +760,7 @@
         if (spec.promptType === 'shopify_domain') openShopifyModal();
         else if (spec.promptType === 'api_key') openKlaviyoModal();
         else if (spec.promptType === 'clarity_key') openClarityModal();
+        else if (spec.promptType === 'recharge_token') openRechargeModal();
         else if (spec.promptType === 'direct') {
           // Direct OAuth — go through the authenticated connect-start endpoint
           // (validates brand ownership + stamps the initiator) then redirect.
@@ -904,6 +934,70 @@
       klaviyoError.hidden = false;
       klaviyoSubmit.disabled = false;
       klaviyoSubmit.textContent = 'Connect';
+    }
+  });
+
+  // ── Recharge modal (1326) ────────────────────────────────────────────────
+  const rechargeModal = document.getElementById('recharge-modal');
+  const rechargeKeyInput = document.getElementById('recharge-key-input');
+  const rechargeError = document.getElementById('recharge-error');
+  const rechargeSubmit = document.getElementById('recharge-submit');
+  let rechargeDone = false;
+
+  function openRechargeModal() {
+    rechargeModal.hidden = false;
+    rechargeKeyInput.value = '';
+    rechargeError.hidden = true;
+    rechargeDone = false;
+    rechargeSubmit.disabled = false;
+    rechargeSubmit.textContent = 'Connect';
+    setTimeout(() => rechargeKeyInput.focus(), 50);
+  }
+  const closeRecharge = () => { rechargeModal.hidden = true; if (rechargeDone) window.location.reload(); };
+  document.getElementById('recharge-cancel').addEventListener('click', closeRecharge);
+  rechargeModal.addEventListener('click', (e) => { if (e.target === rechargeModal) closeRecharge(); });
+  rechargeSubmit.addEventListener('click', async () => {
+    if (rechargeDone) { closeRecharge(); return; }
+    const key = rechargeKeyInput.value.trim();
+    if (key.length < 20 || /\s/.test(key)) {
+      rechargeError.textContent = 'Paste the whole token, with no spaces.';
+      rechargeError.hidden = false;
+      return;
+    }
+    rechargeSubmit.disabled = true;
+    rechargeSubmit.textContent = 'Checking…';
+    rechargeError.hidden = true;
+    try {
+      const resp = await fetch(`${SUPABASE_FNS}/recharge-connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+        body: JSON.stringify({ brand: currentBrand.slug, api_token: key }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        rechargeError.textContent = data.message || data.error || 'Failed to connect.';
+        rechargeError.hidden = false;
+        rechargeSubmit.disabled = false;
+        rechargeSubmit.textContent = 'Connect';
+        return;
+      }
+      // Connected. A token without read access to Customers or Orders still connects: say what will be missing first.
+      if (data.missing_read_access && data.missing_read_access.length) {
+        rechargeDone = true;
+        rechargeKeyInput.value = '';
+        rechargeError.textContent = data.note || 'Connected, with some read access missing.';
+        rechargeError.hidden = false;
+        rechargeSubmit.disabled = false;
+        rechargeSubmit.textContent = 'Done';
+        return;
+      }
+      rechargeModal.hidden = true;
+      window.location.reload();
+    } catch (e) {
+      rechargeError.textContent = `Network error: ${e.message || e}`;
+      rechargeError.hidden = false;
+      rechargeSubmit.disabled = false;
+      rechargeSubmit.textContent = 'Connect';
     }
   });
 
