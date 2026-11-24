@@ -23181,11 +23181,12 @@ function V3Subscriptions() {
   if (!h || !Array.isArray(h.points) || h.points.length < 2) return null;
   const F = h.figures || {}, num = k => (F[k] && F[k].value != null ? Number(F[k].value) : null);
   const last = h.points[h.points.length - 1] || {};
+  const st = F.subs_starts && F.subs_starts.state === 'measured' ? num('subs_starts') : null, sr = num('subs_start_rate');
   const act = num('subs_active'), nw = num('subs_new'), stop = num('subs_stop_rate'), rev = num('subs_renewal_revenue'), due = num('subs_due_30d'), aov = num('renewal_aov');
   const S = h.survival || {};
   const surv = [['Second', S.e2, S.r2], ['Third', S.e3, S.r3], ['Sixth', S.e6, S.r6]].filter(r => Number(r[1]) >= 30);
   const canDrive = v3HasDrivers('subs', h.points);
-  const n = [act, nw, stop, rev, due].filter(v => v != null).length;
+  const n = [act, st != null ? st : nw, stop, rev, due].filter(v => v != null).length;
   if (!n) return null;
   return (<>
     <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Subscriptions">
@@ -23193,7 +23194,8 @@ function V3Subscriptions() {
         <div className="v3-home-group-h">Subscriptions<span>counted from renewal orders</span></div>
         <div className="v3-home-tiles">
           {act != null && <V3HomeTile key="act" k="Active subscriptions" v={fmtCount(act)} delta="estimated" title={F.subs_active.basis || ''}/>}
-          {nw != null && <V3HomeTile key="nw" k="New, last 30 days" v={fmtCount(nw)} delta="first renewals" title={F.subs_new.basis || ''}/>}
+          {st != null ? <V3HomeTile key="st" k="Started, last 30 days" v={fmtCount(st)} delta={sr != null ? fmtPctN(sr) + ' of new customers' : 'at checkout'} title={F.subs_starts.basis || ''}/>
+            : nw != null && <V3HomeTile key="nw" k="New, last 30 days" v={fmtCount(nw)} delta="first renewals" title={F.subs_new.basis || ''}/>}
           {stop != null && <V3HomeTile key="stop" k="Stopped, last 30 days" v={fmtPctN(stop)} delta={last.subs_stopped != null && last.subs_active_prev != null ? fmtCount(Number(last.subs_stopped)) + ' of ' + fmtCount(Number(last.subs_active_prev)) : 'estimated'} title={F.subs_stop_rate.basis || ''}/>}
           {rev != null && <V3HomeTile key="rev" k="Renewal revenue, 30 days" v={fmtMoney(rev)} delta={aov != null ? fmtMoney(aov, 2) + ' a renewal' : ''} title={F.subs_renewal_revenue.basis || ''}
             act={canDrive ? { open, on: () => setOpen(o => !o) } : null}/>}
@@ -28957,7 +28959,7 @@ function v3ModelReturning(a, b, ctx) {
 // 1321: renewal revenue from then to now = active subscriptions x renewals each x renewal order value
 function v3ModelSubs(a, b) {
   const f = p => { const n = Number(p.subs_active), o = Number(p.subs_orders), v = Number(p.subs_rev);
-    return { n, o, v, per: o / n, aov: v / o, st: Number(p.subs_started), sp: Number(p.subs_stopped) }; };
+    return { n, o, v, per: o / n, aov: v / o, st: Number(p.subs_started), sp: Number(p.subs_stopped), ss: p.subs_starts == null ? null : Number(p.subs_starts) }; };
   const A = f(a), B = f(b);
   const [pN, pP, pA] = v3LogParts(A.v, B.v, [{ a: A.n, b: B.n, sign: 1 }, { a: A.per, b: B.per, sign: 1 }, { a: A.aov, b: B.aov, sign: 1 }]);
   const per100 = v => String(Math.round(v * 100));
@@ -28979,7 +28981,8 @@ function v3ModelSubs(a, b) {
     opening: <>Since the 30 days to {v3Day(String(a.d), true)}, renewals brought in {fmtMoney(B.v)}, against {fmtMoney(A.v)}.</>,
     rows: [
       ['Active subscriptions', A.n, B.n, v => fmtCount(v), 'higher'],
-      ['Started in the 30 days', A.st, B.st, v => fmtCount(v), 'higher'],
+      ['Started at checkout', A.ss, B.ss, v => fmtCount(v), 'higher'],   // 1322: null before the sync marks starts, and the row is left out
+      ['First renewals in the 30 days', A.st, B.st, v => fmtCount(v), 'higher'],
       ['Stopped in the 30 days', A.sp, B.sp, v => fmtCount(v), 'lower'],
       ['Renewals', A.o, B.o, v => fmtCount(v), 'higher'],
       ['Renewal order value', A.aov, B.aov, v => fmtMoney(v, 2), 'higher'],
