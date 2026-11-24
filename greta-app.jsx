@@ -23183,6 +23183,8 @@ function V3Subscriptions() {
   const last = h.points[h.points.length - 1] || {};
   const st = F.subs_starts && F.subs_starts.state === 'measured' ? num('subs_starts') : null, sr = num('subs_start_rate');
   const act = num('subs_active'), nw = num('subs_new'), stop = num('subs_stop_rate'), rev = num('subs_renewal_revenue'), due = num('subs_due_30d'), aov = num('renewal_aov');
+  const fed = !!(F.subs_active && F.subs_active.state === 'measured');   // 1323: a subscription app's feed is on
+  const paused = fed ? num('subs_paused') : null;
   const S = h.survival || {};
   const surv = [['Second', S.e2, S.r2], ['Third', S.e3, S.r3], ['Sixth', S.e6, S.r6]].filter(r => Number(r[1]) >= 30);
   const canDrive = v3HasDrivers('subs', h.points);
@@ -23191,15 +23193,15 @@ function V3Subscriptions() {
   return (<>
     <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Subscriptions">
       <div className="v3-home-group" style={{ '--n': n }}>
-        <div className="v3-home-group-h">Subscriptions<span>counted from renewal orders</span></div>
+        <div className="v3-home-group-h">Subscriptions<span>{fed ? 'from your subscription app' : 'counted from renewal orders'}</span></div>
         <div className="v3-home-tiles">
-          {act != null && <V3HomeTile key="act" k="Active subscriptions" v={fmtCount(act)} delta="estimated" title={F.subs_active.basis || ''}/>}
+          {act != null && <V3HomeTile key="act" k="Active subscriptions" v={fmtCount(act)} delta={fed ? (paused != null ? fmtCount(paused) + ' more paused' : '') : 'estimated'} title={F.subs_active.basis || ''}/>}
           {st != null ? <V3HomeTile key="st" k="Started, last 30 days" v={fmtCount(st)} delta={sr != null ? fmtPctN(sr) + ' of new customers' : 'at checkout'} title={F.subs_starts.basis || ''}/>
             : nw != null && <V3HomeTile key="nw" k="New, last 30 days" v={fmtCount(nw)} delta="first renewals" title={F.subs_new.basis || ''}/>}
-          {stop != null && <V3HomeTile key="stop" k="Stopped, last 30 days" v={fmtPctN(stop)} delta={last.subs_stopped != null && last.subs_active_prev != null ? fmtCount(Number(last.subs_stopped)) + ' of ' + fmtCount(Number(last.subs_active_prev)) : 'estimated'} title={F.subs_stop_rate.basis || ''}/>}
+          {stop != null && <V3HomeTile key="stop" k={fed ? 'Cancelled, last 30 days' : 'Stopped, last 30 days'} v={fmtPctN(stop)} delta={last.subs_stopped != null && last.subs_active_prev != null ? fmtCount(Number(last.subs_stopped)) + ' of ' + fmtCount(Number(last.subs_active_prev)) : 'estimated'} title={F.subs_stop_rate.basis || ''}/>}
           {rev != null && <V3HomeTile key="rev" k="Renewal revenue, 30 days" v={fmtMoney(rev)} delta={aov != null ? fmtMoney(aov, 2) + ' a renewal' : ''} title={F.subs_renewal_revenue.basis || ''}
             act={canDrive ? { open, on: () => setOpen(o => !o) } : null}/>}
-          {due != null && <V3HomeTile key="due" k="Renewals due, next 30 days" v={fmtCount(due)} delta="estimated" title={F.subs_due_30d.basis || ''}/>}
+          {due != null && <V3HomeTile key="due" k="Renewals due, next 30 days" v={fmtCount(due)} delta={fed ? 'scheduled' : 'estimated'} title={F.subs_due_30d.basis || ''}/>}
         </div></div>
     </section>
     {/* its own panel: inside the strip a lone group and the panel share one flex row, and the tiles collapse */}
@@ -28983,12 +28985,12 @@ function v3ModelSubs(a, b) {
       ['Active subscriptions', A.n, B.n, v => fmtCount(v), 'higher'],
       ['Started at checkout', A.ss, B.ss, v => fmtCount(v), 'higher'],   // 1322: null before the sync marks starts, and the row is left out
       ['First renewals in the 30 days', A.st, B.st, v => fmtCount(v), 'higher'],
-      ['Stopped in the 30 days', A.sp, B.sp, v => fmtCount(v), 'lower'],
+      ['Stopped or cancelled in the 30 days', A.sp, B.sp, v => fmtCount(v), 'lower'],
       ['Renewals', A.o, B.o, v => fmtCount(v), 'higher'],
       ['Renewal order value', A.aov, B.aov, v => fmtMoney(v, 2), 'higher'],
       ['Renewal revenue', A.v, B.v, v => fmtMoney(v), 'higher'],
     ],
-    note: 'A subscription counts as active while the customer’s last renewal is within one and a half times their own gap between renewals. Orders cannot tell a pause or a failed card from a cancellation, so all three read as stopped.',
+    note: 'With a subscription app connected, active and cancelled are the app’s own counts. Without one, a subscription counts as active while the customer’s last renewal is within one and a half times their own gap between renewals, and a pause, a failed card and a cancellation all read as stopped.',
   };
 }
 // Marketing (0317): ad spend by campaign (0311's campaign lists; the rest is campaigns under £50 and
