@@ -11767,11 +11767,12 @@ const V3_MOVES = [
   ['email-campaign-drop', ['email', 'retsales']], ['email-cart-reach', ['email', 'conv']], ['site-errors', ['conv']],
   ['returns-product-', ['profit', 'prodsales']], ['seo-nonbrand', ['organic']],
   ['email-list-health', ['email']], ['email-list-growth', ['email']], ['email-holdout', ['email']], ['site-speed', ['conv']], ['returns-faults', ['profit']],
+  ['subs-stop-rise', ['subs', 'retsales']], ['subs-early-drop', ['subs']], ['subs-take-fall', ['subs', 'newc']], ['subs-stock-cover-', ['subs', 'prodsales']],   // 1321
 ];
 const V3_MOVE_LABEL = { cac: 'cost of a new customer', ret: 'sales from each £1 of ads', profit: 'profit after ads', ly: 'sales against last year',
   repeat: 'customers who order again', conv: 'orders per 100 visits', newc: 'new customers', retsales: 'returning customers’ sales', spend: 'ad spend',
   metacpa: 'Meta’s cost per sale', googcpa: 'Google’s cost per sale', newsales: 'new customers’ sales', prodsales: 'product sales', aov: 'the average order',
-  brandshare: 'searches for your name', email: 'sales from email campaigns', organic: 'visits from unpaid search' };
+  brandshare: 'searches for your name', email: 'sales from email campaigns', organic: 'visits from unpaid search', subs: 'renewal revenue' };
 const v3Moves = id => { const k = String(id || ''); const m = V3_MOVES.find(([p]) => (p.endsWith('-') ? k.startsWith(p) : k === p)); return m ? m[1] : []; };
 // ── The unpriced lane (0991) ─────────────────────────────────────────────
 // The board ranks by pounds, so an open action with no figure never reached it: on 20 Oct the Black Friday plan
@@ -23170,6 +23171,47 @@ function V3CustomerList({ name, rows, onClose }) {
 }
 const V3_SEG_ORDER = ['Champion', 'Loyal', 'Promising (new)', 'At risk', 'Dormant (one-time)'];
 const v3Dp1Num = v => (fmtOk(v) ? Number(v).toFixed(1) : FMT_NONE);
+// 1321: the Subscription part on Customers. Figure strip, the driver panel behind renewal revenue, and the share
+// still renewing at each renewal. Every figure is the anatomy's own (cache_subs_history.figures), never recounted
+// here. Left out for a brand with no renewals to speak of.
+function V3Subscriptions() {
+  const q = useV3Rows('subs-history', V3_SUBS_HIST_Q);
+  const [open, setOpen] = React.useState(false);
+  const h = q.rows && q.rows[0] && q.rows[0].history;
+  if (!h || !Array.isArray(h.points) || h.points.length < 2) return null;
+  const F = h.figures || {}, num = k => (F[k] && F[k].value != null ? Number(F[k].value) : null);
+  const last = h.points[h.points.length - 1] || {};
+  const act = num('subs_active'), nw = num('subs_new'), stop = num('subs_stop_rate'), rev = num('subs_renewal_revenue'), due = num('subs_due_30d'), aov = num('renewal_aov');
+  const S = h.survival || {};
+  const surv = [['Second', S.e2, S.r2], ['Third', S.e3, S.r3], ['Sixth', S.e6, S.r6]].filter(r => Number(r[1]) >= 30);
+  const canDrive = v3HasDrivers('subs', h.points);
+  const n = [act, nw, stop, rev, due].filter(v => v != null).length;
+  if (!n) return null;
+  return (<>
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Subscriptions">
+      <div className="v3-home-group" style={{ '--n': n }}>
+        <div className="v3-home-group-h">Subscriptions<span>counted from renewal orders</span></div>
+        <div className="v3-home-tiles">
+          {act != null && <V3HomeTile key="act" k="Active subscriptions" v={fmtCount(act)} delta="estimated" title={F.subs_active.basis || ''}/>}
+          {nw != null && <V3HomeTile key="nw" k="New, last 30 days" v={fmtCount(nw)} delta="first renewals" title={F.subs_new.basis || ''}/>}
+          {stop != null && <V3HomeTile key="stop" k="Stopped, last 30 days" v={fmtPctN(stop)} delta={last.subs_stopped != null && last.subs_active_prev != null ? fmtCount(Number(last.subs_stopped)) + ' of ' + fmtCount(Number(last.subs_active_prev)) : 'estimated'} title={F.subs_stop_rate.basis || ''}/>}
+          {rev != null && <V3HomeTile key="rev" k="Renewal revenue, 30 days" v={fmtMoney(rev)} delta={aov != null ? fmtMoney(aov, 2) + ' a renewal' : ''} title={F.subs_renewal_revenue.basis || ''}
+            act={canDrive ? { open, on: () => setOpen(o => !o) } : null}/>}
+          {due != null && <V3HomeTile key="due" k="Renewals due, next 30 days" v={fmtCount(due)} delta="estimated" title={F.subs_due_30d.basis || ''}/>}
+        </div></div>
+    </section>
+    {/* its own panel: inside the strip a lone group and the panel share one flex row, and the tiles collapse */}
+    {open && canDrive && <section className="v3-panel" aria-label="Renewal revenue, from then to now"><div className="v3-panel-pad"><V3DriverPanel key="subs" which="subs" points={h.points}/></div></section>}
+    {surv.length > 0 && (<section className="v3-panel" aria-label="Subscriptions still renewing">
+      <div className="v3-panel-head"><h2>Subscriptions still renewing</h2><span className="v3-muted">Begun in the last two years</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Renewal</th><th className="r">Old enough to reach it</th><th className="r">Reached it</th><th className="r">Share</th></tr></thead>
+        <tbody>{surv.map(r => (<tr key={r[0]}><td>{r[0]}</td><td className="r">{fmtCount(Number(r[1]))}</td><td className="r">{fmtCount(Number(r[2]))}</td><td className="r">{fmtPctN(Number(r[2]) / Number(r[1]))}</td></tr>))}</tbody>
+      </table></div>
+    </section>)}
+  </>);
+}
+
 function V3Customers({ start, period, customActive }) {
   useV3Setup();   // which sources are connected (v3NoAdAccount)
   const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
@@ -23374,6 +23416,8 @@ function V3Customers({ start, period, customActive }) {
         </>}
       <V3PageLegend/>
     </section>
+
+    <V3Subscriptions/>
 
     {!allFailed && !allWait && !empty && (<section className="v3-panel" aria-label="New and returning customers">
       <div className="v3-panel-head"><h2>New and returning customers</h2><span className="v3-muted">{len === 1 ? 'By day' : len + ' days at a time'}</span></div>
@@ -27226,6 +27270,9 @@ const v3Pence = v => (v >= 1 ? fmtMoney(v, 2) : Math.round(v * 100) + 'p');
 const V3_YESTERDAY_Q = (sb, b) => sb.rpc('fn_brand_yesterday', { p_brand: b })
   .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
 const V3_SIGN_HIST_Q = (sb, b) => sb.from('cache_brand_sign_history').select('history,refreshed_at').eq('brand_id', b).limit(1);
+// 1321: subscriptions at 13 weekly points, with the part's own figures (cache_subs_history, written by the chain).
+// A brand with no renewals to speak of has no row; before 1321 the read fails. Either way the section is left out.
+const V3_SUBS_HIST_Q = (sb, b) => sb.from('cache_subs_history').select('history,refreshed_at').eq('brand_id', b).limit(1);
 // The signs and the headline, built once for every page that shows them (Today, and since 9 Oct Profit &
 // sales, Marketing, Customers, Growth plan, Review and Goal & costs), so a figure, its arrow and its
 // drivers read the same wherever it appears. S is fn_brand_state; hist is cache_brand_sign_history.
@@ -28907,6 +28954,40 @@ function v3ModelReturning(a, b, ctx) {
     note: 'Returning buyers are customers whose order in the 30 days was not their first, as on the rest of this page: orders from your own shop, with marketplace orders counted apart.',
   };
 }
+// 1321: renewal revenue from then to now = active subscriptions x renewals each x renewal order value
+function v3ModelSubs(a, b) {
+  const f = p => { const n = Number(p.subs_active), o = Number(p.subs_orders), v = Number(p.subs_rev);
+    return { n, o, v, per: o / n, aov: v / o, st: Number(p.subs_started), sp: Number(p.subs_stopped) }; };
+  const A = f(a), B = f(b);
+  const [pN, pP, pA] = v3LogParts(A.v, B.v, [{ a: A.n, b: B.n, sign: 1 }, { a: A.per, b: B.per, sign: 1 }, { a: A.aov, b: B.aov, sign: 1 }]);
+  const per100 = v => String(Math.round(v * 100));
+  return {
+    todo: [{ amt: pN, ids: ['subs-stop-rise', 'subs-early-drop', 'subs-take-fall'] }, { amt: pP, ids: ['subs-stock-cover-', 'subs-stop-rise'] }, { amt: pA, ids: ['basket-pair'] }],
+    title: 'Why renewals brought in ' + fmtMoney(B.v), from: A.v, to: B.v, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'Renewal revenue', endK: 'Renewal revenue now', chartK: 'Renewal revenue',
+    parts: [
+      { amt: pN, k: v3UpDown(A.n, B.n, 'More active subscriptions', 'Fewer active subscriptions'), sub: fmtCount(A.n) + ' to ' + fmtCount(B.n) + ' active',
+        cause: <>{v3UpDown(A.n, B.n, 'more', 'fewer')} subscriptions were active ({fmtCount(A.n)} to {fmtCount(B.n)})</>,
+        against: <>{v3UpDown(A.n, B.n, 'More', 'Fewer')} active subscriptions ({fmtCount(A.n)} to {fmtCount(B.n)})</> },
+      { amt: pP, k: v3UpDown(A.per, B.per, 'More renewals each', 'Fewer renewals each'), sub: per100(A.per) + ' to ' + per100(B.per) + ' renewals per 100 active',
+        cause: <>each active subscription renewed {v3UpDown(A.per, B.per, 'more', 'less')} often in the 30 days</>,
+        against: <>{v3UpDown(A.per, B.per, 'More', 'Fewer')} renewals from each active subscription</> },
+      { amt: pA, k: v3UpDown(A.aov, B.aov, 'Bigger renewals', 'Smaller renewals'), sub: fmtMoney(A.aov, 2) + ' to ' + fmtMoney(B.aov, 2) + ' a renewal',
+        cause: <>renewals were {v3UpDown(A.aov, B.aov, 'bigger', 'smaller')} ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)})</>,
+        against: <>{v3UpDown(A.aov, B.aov, 'Bigger', 'Smaller')} renewals ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)})</> },
+    ],
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, renewals brought in {fmtMoney(B.v)}, against {fmtMoney(A.v)}.</>,
+    rows: [
+      ['Active subscriptions', A.n, B.n, v => fmtCount(v), 'higher'],
+      ['Started in the 30 days', A.st, B.st, v => fmtCount(v), 'higher'],
+      ['Stopped in the 30 days', A.sp, B.sp, v => fmtCount(v), 'lower'],
+      ['Renewals', A.o, B.o, v => fmtCount(v), 'higher'],
+      ['Renewal order value', A.aov, B.aov, v => fmtMoney(v, 2), 'higher'],
+      ['Renewal revenue', A.v, B.v, v => fmtMoney(v), 'higher'],
+    ],
+    note: 'A subscription counts as active while the customer’s last renewal is within one and a half times their own gap between renewals. Orders cannot tell a pause or a failed card from a cancellation, so all three read as stopped.',
+  };
+}
 // Marketing (0317): ad spend by campaign (0311's campaign lists; the rest is campaigns under £50 and
 // rounding, so the parts add up to the spend), and each platform's cost per sale on its own count:
 //   Meta   spend / purchases = (spend / views) x (views / clicks) x (clicks / purchases)
@@ -29124,7 +29205,7 @@ function v3ModelClaims(a, b, ctx) {
   };
 }
 // 3 Nov: one colour per meaning. The week a driver panel explains wears the colour of what the panel is about.
-const v3DriverCol = which => ({ claims: PAL.ads, spend: PAL.ads, metacpa: PAL.ads, googcpa: PAL.ads2, cac: PAL.ads, ret: PAL.ads, newsales: PAL.nw, newc: PAL.nw, retsales: PAL.ret, repeat: PAL.ret, conv: PAL.site, ly: PAL.sales, profit: PAL.kept }[which] || PAL.muted);
+const v3DriverCol = which => ({ claims: PAL.ads, spend: PAL.ads, metacpa: PAL.ads, googcpa: PAL.ads2, cac: PAL.ads, ret: PAL.ads, newsales: PAL.nw, newc: PAL.nw, retsales: PAL.ret, repeat: PAL.ret, subs: PAL.ret, conv: PAL.site, ly: PAL.sales, profit: PAL.kept }[which] || PAL.muted);
 const V3_DRIVER_MODELS = {
   email: { model: v3ModelEmail, mode: 'pair', key: 'em_rev', fmt: v => fmtMoney(v),
            ok: p => Number(p.em_sends) > 0 && Number(p.em_opens) > 0 && Number(p.em_clicks) > 0 && Number(p.em_rev) > 0 },
@@ -29158,6 +29239,8 @@ const V3_DRIVER_MODELS = {
             ok: p => p.vs_ly != null && Number(p.sales_ly) > 0 && p.dtc_net != null },
   repeat: { model: v3ModelRepeat,   mode: 'pair',   key: 'repeat_90d', fmt: v => fmtPctN(v),
             ok: p => p.repeat_90d != null && Number(p.rep_code_n) + Number(p.rep_full_n) >= 30 && p.rep_code != null && p.rep_full != null },
+  subs:   { model: v3ModelSubs,     mode: 'pair',   key: 'subs_rev',   fmt: v => fmtMoney(v),   // 1321: points from cache_subs_history
+            ok: p => Number(p.subs_active) > 0 && Number(p.subs_orders) > 0 && p.subs_rev != null },
 };
 const v3HasDrivers = (which, points) => { const m = V3_DRIVER_MODELS[which]; if (!m || !Array.isArray(points)) return false;
   const P = (m.prep ? m.prep(points, {}) : points).filter(m.ok); return m.mode === 'single' ? P.length >= 1 : P.length >= 2; };
