@@ -21461,6 +21461,10 @@ const V3_GY_Q = (g, m, lv, vb, lev) => (sb, b) => sb.rpc('fn_plan_growth', { p_b
 // on those inputs, so no stored figure is shown beside a live one.
 const V3_TS_Q = (sb, b) => sb.rpc('fn_target_sheet', { p_brand: b })
   .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
+// 1324: the two subscription levers. fn_subs_levers turns them into the planner's returning order rate, which is the
+// only thing the plan is asked for; it returns renewals, never pounds (the planner prices the rate).
+const V3_SL_Q = (ss, sc) => (sb, b) => sb.rpc('fn_subs_levers', { p_brand: b, p_start_rate: ss, p_cancel_rate: sc })
+  .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
 const v3GyLevEq = (a, b) => { const ka = Object.keys(a || {}), kb = Object.keys(b || {});
   return ka.length === kb.length && ka.every(k => b[k] != null && Math.abs(Number(a[k]) - Number(b[k])) < 1e-9); };
 // realism: how hard the plan is for this brand to deliver, against its own record (not how sure the figures are)
@@ -21474,6 +21478,7 @@ const V3_GY_REAL = {
 const V3_GY_GRADE = {
   as_last_year: ['As last year', 'v3-pill-none'], done_before: ['Done before', 'v3-pill-good'],
   stretch: ['Stretch', 'v3-pill-warn'], step_change: ['Step change', 'v3-pill-bad'],
+  as_now: ['As now', 'v3-pill-none'], worse: ['Below now', 'v3-pill-warn'],   // 1324: the subscription levers are read against today
 };
 const V3_GY_EMPTY = {
   no_history: 'The year plan shows once there is a full month of sales.',
@@ -21549,8 +21554,19 @@ function V3GrowthYear() {
   const applyG = () => { const n = v3GyNum(gTxt); setG(n == null ? null : Math.max(-50, Math.min(500, n)) / 100); };
   const applyM = () => { const n = v3GyNum(mTxt); setM(n == null ? null : Math.max(-50, Math.min(95, n)) / 100); };
   const onKey = f => e => { if (e.key === 'Enter') f(); };
-  const setLever = (k, v) => setLev(o => Object.assign({}, o, { [k]: v }));
+  // 1324: moving the returning order rate by hand drops the subscription rates, which no longer describe it
+  const setLever = (k, v) => setLev(o => { const n = Object.assign({}, o, { [k]: v }); if (k === 'rr') { delete n.ss; delete n.sc; } return n; });
   const setAll = o => { setLev(o); setLevQ(o); };
+  const ssQ = levQ.ss != null ? Number(levQ.ss) : null, scQ = levQ.sc != null ? Number(levQ.sc) : null;
+  const slq = useV3Rows('subs-levers:' + (ssQ == null ? '' : ssQ) + ':' + (scQ == null ? '' : scQ), V3_SL_Q(ssQ, scQ));
+  const SL0 = slq.rows && slq.rows[0] && slq.rows[0].ok && slq.rows[0].applies ? slq.rows[0] : null;
+  const [slLast, setSlLast] = React.useState(null);
+  React.useEffect(() => { if (SL0) setSlLast(SL0); }, [SL0]);
+  const SL = SL0 || slLast;
+  // the rate the two subscription levers come to is put on the returning order rate, for the lever set that asked
+  React.useEffect(() => { if (!SL0 || (ssQ == null && scQ == null)) return;
+    const want = Number(SL0.rr_implied);
+    setLev(o => (o.ss == null && o.sc == null) || (o.rr != null && Math.abs(Number(o.rr) - want) < 1e-9) ? o : Object.assign({}, o, { rr: want })); }, [SL0, ssQ, scQ]);
   const ts = useV3Rows('target-sheet', V3_TS_Q);
   const TS = ts.rows && ts.rows[0] ? ts.rows[0] : null, S = TS && TS.ok ? TS.sheet : null;
   const tsBack = React.useRef(false);              // the saved inputs are put back once, when the sheet first arrives
@@ -21748,7 +21764,27 @@ function V3GrowthYear() {
         <th>Realism</th></tr></thead>
       <tbody>{V3_GY_KEYS.filter(k => LVk[k]).map(k => { const l = LVk[k], d = V3_GY_LEVERS[k], rg = v3GyRange(k, l);
           const val = lev[k] != null ? Number(lev[k]) : Number(l.plan), gr = V3_GY_GRADE[l.grade] || V3_GY_GRADE.as_last_year;
-          return (<tr key={k}>
+          const subRows = k === 'rr' && SL ? [
+            SL.start && SL.start.available ? ['ss', 'Starting a subscription', 'of new customers', 'Subscription offer at checkout', SL.now.start_rate, SL.start, 0.001,
+              [Math.max(0.001, Number(SL.now.start_rate) * 0.5), Math.max(Number(SL.now.start_rate) * 2, Number(SL.start.best_month || 0) * 1.5, 0.02)], SL.start.best_month] : null,
+            SL.cancel ? ['sc', 'Subscriptions cancelled', 'a month', 'Failed-payment retries, pause in place of cancel', SL.now.cancel_rate, SL.cancel, 0.001,
+              [Math.max(0.005, Number(SL.now.cancel_rate) * 0.4), Math.max(Number(SL.now.cancel_rate) * 1.5, 0.02)], SL.cancel.best] : null,
+          ].filter(Boolean).map(r => { const sv = lev[r[0]] != null ? Number(lev[r[0]]) : Number(r[4]), sg = V3_GY_GRADE[r[5].grade] || V3_GY_GRADE.as_now;
+            const pc = v => (Number(v) * 100).toFixed(1) + '%', ex = Number(r[5].extra_renewals_year);
+            return (<tr key={r[0]} className="v3-gy-sub">
+              <td className="v3-gy-lname">{r[1]}<small>{r[2]}</small></td>
+              <td className="v3-gy-by">{r[3]}</td>
+              <td className="r">{pc(r[4])}</td>
+              <td><span className="v3-gy-slide">
+                <input type="range" min={r[7][0]} max={r[7][1]} step={r[6]} value={Math.min(r[7][1], Math.max(r[7][0], sv))} aria-label={r[1] + ' in the plan'}
+                  aria-valuetext={pc(sv)} onChange={e => setLev(o => Object.assign({}, o, { [r[0]]: Number(e.target.value) }))}/>
+                <b>{pc(sv)}</b></span></td>
+              <td className="r">{r[8] != null ? pc(r[8]) : FMT_NONE}</td>
+              <td className="r">{FMT_NONE}</td>
+              <td className="r">{r[5].lands_months === 1 ? '1 month' : r[5].lands_months + ' months'}</td>
+              <td className="r" colSpan={2}>{isFinite(ex) && Math.abs(ex) >= 1 ? (ex > 0 ? '+' : '−') + fmtCount(Math.abs(ex)) + ' renewals in the year' : FMT_NONE}</td>
+              <td><b className={'v3-pill ' + sg[1]}>{sg[0]}</b></td></tr>); }) : [];
+          return (<React.Fragment key={k}><tr>
             <td className="v3-gy-lname">{d.name}<small>{d.unit}</small></td>
             <td className="v3-gy-by">{d.by}</td>
             <td className="r">{k === 'cv' ? v3GyPct(0) : d.fmt(l.last_year)}</td>
@@ -21761,7 +21797,7 @@ function V3GrowthYear() {
             <td className="r">{l.lands_months === 1 ? '1 month' : l.lands_months + ' months'}</td>
             <td className="r">{v3GyAdd(l.adds_sales)}</td>
             <td className="r">{v3GyAdd(l.adds_level)}</td>
-            <td><b className={'v3-pill ' + gr[1]}>{gr[0]}</b></td></tr>); })}
+            <td><b className={'v3-pill ' + gr[1]}>{gr[0]}</b></td></tr>{subRows}</React.Fragment>); })}
         <tr className="v3-gy-cm">
           <td className="v3-gy-lname">Ad spend<small>the rest</small></td>
           <td className="v3-gy-by">Meta, Google, TikTok</td>
