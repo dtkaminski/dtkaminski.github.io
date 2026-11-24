@@ -21804,7 +21804,8 @@ function V3GrowthYear() {
             return (<tr key={r[0]} className="v3-gy-sub">
               <td className="v3-gy-lname">{r[1]}<small>{r[2]}</small></td>
               <td className="v3-gy-by">{r[3]}</td>
-              <td className="r">{pc(r[4])}</td>
+              {/* the column is headed Last year, and these two rows are read against today's rate (grade "As now"): say so in the cell */}
+              <td className="r v3-gy-now">{pc(r[4])}<small>now</small></td>
               <td><span className="v3-gy-slide">
                 <input type="range" min={r[7][0]} max={r[7][1]} step={r[6]} value={Math.min(r[7][1], Math.max(r[7][0], sv))} aria-label={r[1] + ' in the plan'}
                   aria-valuetext={pc(sv)} onChange={e => setLev(o => Object.assign({}, o, { [r[0]]: Number(e.target.value) }))}/>
