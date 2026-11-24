@@ -18129,6 +18129,7 @@ const v3CashInputs = m => String(m || '').replace(/[{}"]/g, '').split(',').map(s
   .map(s => V3_CASH_FIELD[s] || s.replace(/_/g, ' ')).join(', ');
 function CashCeiling(){
   const [gate, setGate] = React.useState(undefined);
+  const [due, setDue] = React.useState(null);
   // The cash the brand entered, as Goal & costs reads it (cache_brand_state.state.cash_to_peak). The
   // week-by-week gate has no rows for any brand (23 Oct: brand_cash_ceiling and brand_cash_week are empty),
   // so this card asked Halden to "add the cash you have now" under the £640,000 it entered on 15 Oct.
@@ -18146,6 +18147,12 @@ function CashCeiling(){
       .eq('brand_id', brand).limit(1)
       .then(r => { if (alive) setGate(!r || r.error ? false : (r.data && r.data[0]) || null); })
       .catch(() => alive && setGate(false));
+    // 1325: how much of the 13 weeks' sales is renewals already scheduled. Read beside the check, never added to it.
+    sb.from('vw_brand_cash_13w').select('net_revenue, renewals_due').eq('brand_id', brand)
+      .then(r => { if (!alive || !r || r.error || !r.data) return;
+        const w = r.data.filter(x => x.renewals_due != null);
+        if (w.length) setDue({ due: w.reduce((a, x) => a + Number(x.renewals_due), 0), sales: r.data.reduce((a, x) => a + Number(x.net_revenue || 0), 0) }); },
+        () => {});
     return () => { alive = false; };
   }, []);
 
@@ -18171,6 +18178,8 @@ function CashCeiling(){
     // answer, so it goes; the basis below says what the check spends.
     gate.s_cash_weekly != null && { k: 'Most cash allows a week', v: v3GbpRound(gate.s_cash_weekly), b: 'Money expected in and out at the goal’s ad budget, stock included' },
     gate.min_cash != null && { k: 'Lowest balance', v: v3GbpRound(gate.min_cash), b: [gate.cash_floor != null ? 'Your minimum ' + v3GbpRound(gate.cash_floor) : null, gate.min_cash_week_start ? 'Week of ' + v3Day(String(gate.min_cash_week_start).slice(0, 10), true) : null].filter(Boolean).join('. ') },
+    due && due.due > 0 && due.sales > 0 && due.due <= due.sales && { k: 'Renewals due', v: v3GbpRound(due.due),
+      b: 'Subscription renewals already scheduled. Part of the ' + v3GbpRound(due.sales) + ' of sales this check counts on, not on top of it' },
     gap > 0 && { k: 'Extra cash needed', v: v3GbpRound(gap), b: gate.first_breach_week_start ? 'First short in the week of ' + v3Day(String(gate.first_breach_week_start).slice(0, 10), true) : '', cls: 'v3-down' },
   ].filter(Boolean);
   return (<section className="v3-panel" aria-label="Cash">{head(pill)}
