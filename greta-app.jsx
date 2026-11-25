@@ -10073,6 +10073,7 @@ ${dataStr}`;
   ];
 
   return (<div>
+    {UI_V3 && <V3MissingFigures/>}
     <div className="card" style={{marginBottom:14}}>
       {!UI_V3 && <h2>Ask Greta</h2>}
       <p className="v3-note v3-measure" style={{marginTop:0}}>Answers come from the same figures your pages show, which are sent to an AI model to write the reply. Your questions and the answers are kept in your workspace, private to your team, so you can come back to them on any device.</p>
@@ -12181,6 +12182,60 @@ function V3ChannelScoreboard(){
   );
 }
 
+// 1346: the figures Greta is missing, asked one at a time. The questions, their ready answers and where each answer is
+// saved are the server's (fn_gap_questions, fn_gap_answer); this panel asks the first open one and shows what was saved.
+const V3_GAPS_Q = (sb, b) => sb.rpc('fn_gap_questions', { p_brand: b }).then(r => ({ data: r.data ? [r.data] : [], error: r.error }));
+function V3MissingFigures(){
+  const q = useV3Rows('gap-questions', V3_GAPS_Q);
+  const [over, setOver] = React.useState(null);
+  const [val, setVal] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+  const list = over || (q.rows && q.rows[0]) || [];
+  if (!Array.isArray(list) || (!list.length && !msg)) return null;
+  const cur = list[0];
+  const answer = async (value, choice) => {
+    const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+    if (!sb || !b || !cur) { setMsg({ ok: false, text: 'Your session expired. Refresh the page and sign in again.' }); return; }
+    setBusy(true);
+    try {
+      const r = await sb.rpc('fn_gap_answer', { p_brand: b, p_key: cur.key, p_value: value == null ? null : Number(value), p_choice: choice || 'value' });
+      if (r && r.error) throw new Error(/42501|not allowed/i.test(String(r.error.code || r.error.message)) ? 'Only the owner or an editor can enter this.' : (r.error.message || 'Could not save. Try again.'));
+      const d = r.data || {};
+      setOver(Array.isArray(d.questions) ? d.questions : list.slice(1));
+      setMsg({ ok: true, text: d.said || 'Saved.' });
+      setVal('');
+      try { track('gap_answered', { key: cur.key, choice: choice || 'value' }, 'setup'); } catch (e) {}
+    } catch (e) { setMsg({ ok: false, text: String((e && e.message) || e) }); }
+    setBusy(false);
+  };
+  const opts = cur && Array.isArray(cur.options) ? cur.options : [];
+  const num = cur && cur.number;
+  return (
+    <section className="v3-panel v3-gaps v3-enter" aria-label="Missing figures">
+      <div className="v3-panel-head"><h2>Missing figures</h2>{list.length > 0 && <span className="v3-count">{fmtCount(list.length)}</span>}</div>
+      {msg && <p className={'v3-panel-note' + (msg.ok ? '' : ' v3-down')} role="status">{msg.text}</p>}
+      {cur && <div className="v3-panel-pad">
+        <div className="v3-gap-title">{cur.title}</div>
+        <p className="v3-muted v3-gap-note">{cur.note}</p>
+        {opts.length > 0 && <div className="v3-gap-opts">
+          {opts.map((o, i) => <button key={o.label} type="button" className="v3-btn v3-btn-sm" disabled={busy}
+            onClick={() => answer(o.choice ? null : o.value, o.choice || 'value')}><span className="v3-gap-key" aria-hidden="true">{'ABCDEF'.charAt(i)}</span>{o.label}</button>)}
+        </div>}
+        {num && <form className="v3-gap-num" onSubmit={e => { e.preventDefault(); if (val !== '' && !busy) answer(val, 'value'); }}>
+          <span className="v3-muted">{opts.length > 0 ? 'Your own figure' : 'Your figure'}</span>
+          {num.prefix && <span>{num.prefix}</span>}
+          <input type="number" inputMode="decimal" step="any" min={num.min} max={num.max} value={val} disabled={busy}
+            onChange={e => setVal(e.target.value)} aria-label={cur.title}/>
+          {num.suffix && <span className="v3-muted">{num.suffix}</span>}
+          <button type="submit" className="v3-btn v3-btn-sm v3-btn-p" disabled={busy || val === ''}>Save</button>
+        </form>}
+        <div className="v3-gap-foot"><button type="button" className="v3-linkbtn" disabled={busy} onClick={() => answer(null, 'skip')}>Not now</button></div>
+      </div>}
+    </section>
+  );
+}
+
 // 1342: what the board is worth, how much of it can be checked after acting, and what has been shown. Worked out once
 // (fn_action_value, carried as state.action_value) and quoted; this strip computes nothing.
 function V3ActionValue(){
@@ -12211,6 +12266,7 @@ function ActionsView(){
       {/* No heading here: the page head one line above already reads "Actions / What should I do
           first?". Saying it twice is the kind of thing that makes a product feel unedited. */}
       <V3ActionValue/>
+      <V3MissingFigures/>
       <V3ActionBoard/>
       <V3GretaRuns/>
       {/* V3: the browser planner's stock list (28 to order, sized to its own demand plan, against the

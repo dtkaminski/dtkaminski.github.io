@@ -2812,3 +2812,13 @@ td.v3-tpl-fig { font-weight: var(--weight-normal); white-space: nowrap; }
 @media (max-width: 760px) {
   .v3-figs-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Missing figures (Actions, Ask Greta): one question, its ready answers lettered, a number field, a way to put it off. */
+.v3-gaps { margin-bottom: var(--space-6); }
+.v3-gap-title { font-weight: var(--weight-semi); color: var(--color-ink); }
+.v3-gap-note { margin: var(--space-1) 0 var(--space-3); font-size: var(--text-sm); }
+.v3-gap-opts { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+.v3-gap-key { margin-right: var(--space-2); color: var(--color-muted); font-family: var(--font-figure); }
+.v3-gap-num { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.v3-gap-num input { width: calc(var(--space-16) * 2); }
+.v3-gap-foot { margin-top: var(--space-3); }
