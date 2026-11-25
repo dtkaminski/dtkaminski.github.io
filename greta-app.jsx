@@ -12181,11 +12181,36 @@ function V3ChannelScoreboard(){
   );
 }
 
+// 1342: what the board is worth, how much of it can be checked after acting, and what has been shown. Worked out once
+// (fn_action_value, carried as state.action_value) and quoted; this strip computes nothing.
+function V3ActionValue(){
+  const st = useV3Rows('brand-state', V3_STATE_Q);
+  const A = st.rows && st.rows[0] && st.rows[0].action_value;
+  if (!A || !(Number(A.found_rows) > 0)) return null;
+  const n = v => Number(v) || 0;
+  const acts = v => fmtCount(n(v)) + (n(v) === 1 ? ' action' : ' actions');
+  const done = n(A.done_by_owner), seen = Math.min(n(A.done_seen_in_data), done);
+  const graded = n(A.claims_graded);
+  return (
+    <section className="v3-panel v3-actval v3-enter" aria-label="Action value">
+      <div className="v3-panel-head"><h2>Action value</h2><span className="v3-muted">A month, if each action does what it says</span></div>
+      <div className="v3-figs v3-figs-panel">
+        <div className="v3-stat"><span className="v3-stat-lab">On the board</span><div className="v3-stat-val">{v3Gbp(n(A.found_gbp_month))}</div><span className="v3-stat-foot v3-muted">{acts(A.found_rows)}</span></div>
+        <div className="v3-stat"><span className="v3-stat-lab">Checkable after acting</span><div className="v3-stat-val">{v3Gbp(n(A.checkable_gbp_month))}</div><span className="v3-stat-foot v3-muted">{acts(A.checkable_rows)}</span></div>
+        <div className="v3-stat"><span className="v3-stat-lab">Done</span><div className="v3-stat-val">{fmtCount(done)}</div><span className="v3-stat-foot v3-muted">{seen > 0 ? fmtCount(seen) + ' seen in your data' : 'None seen in your data'}</span></div>
+        <div className="v3-stat"><span className="v3-stat-lab">Measured</span><div className="v3-stat-val">{v3Gbp(n(A.proven_gbp))}</div><span className="v3-stat-foot v3-muted">{fmtCount(n(A.done_worked))} worked, {fmtCount(n(A.done_not_judged))} not judged</span></div>
+        <div className="v3-stat"><span className="v3-stat-lab">Claims come true</span><div className="v3-stat-val">{graded > 0 ? fmtCount(n(A.claims_came_true)) + ' of ' + fmtCount(graded) : FMT_NONE}</div><span className="v3-stat-foot v3-muted">{graded > 0 ? 'Dated claims now due' : 'None due yet'}</span></div>
+      </div>
+    </section>
+  );
+}
+
 function ActionsView(){
   return (
     <div>
       {/* No heading here: the page head one line above already reads "Actions / What should I do
           first?". Saying it twice is the kind of thing that makes a product feel unedited. */}
+      <V3ActionValue/>
       <V3ActionBoard/>
       <V3GretaRuns/>
       {/* V3: the browser planner's stock list (28 to order, sized to its own demand plan, against the
