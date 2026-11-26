@@ -12253,7 +12253,7 @@ function V3ActionValue(){
         <div className="v3-stat"><span className="v3-stat-lab">Checkable after acting</span><div className="v3-stat-val">{v3GbpRound(n(A.checkable_gbp_month))}</div><span className="v3-stat-foot v3-muted">{acts(A.checkable_rows)}</span></div>
         <div className="v3-stat"><span className="v3-stat-lab">Done</span><div className="v3-stat-val">{fmtCount(done)}</div><span className="v3-stat-foot v3-muted">{seen > 0 ? fmtCount(seen) + ' seen in your data' : 'None seen in your data'}</span></div>
         <div className="v3-stat"><span className="v3-stat-lab">Measured</span><div className="v3-stat-val">{v3Gbp(n(A.proven_gbp))}</div><span className="v3-stat-foot v3-muted">{fmtCount(n(A.done_worked))} worked, {fmtCount(n(A.done_not_judged))} not judged</span></div>
-        <div className="v3-stat"><span className="v3-stat-lab">Claims come true</span><div className="v3-stat-val">{graded > 0 ? fmtCount(n(A.claims_came_true)) + ' of ' + fmtCount(graded) : FMT_NONE}</div><span className="v3-stat-foot v3-muted">{graded > 0 ? 'Dated claims now due' : 'None due yet'}</span></div>
+        <div className="v3-stat"><span className="v3-stat-lab">Claims come true</span><div className="v3-stat-val">{graded > 0 ? fmtCount(n(A.claims_came_true)) + ' of ' + fmtCount(graded) : FMT_NONE}</div><span className="v3-stat-foot v3-muted">{graded <= 0 ? 'None due yet' : n(A.claims_forecast_graded) > 0 && n(A.claims_rows_graded) > 0 ? 'Rows ' + fmtCount(n(A.claims_rows_came_true)) + ' of ' + fmtCount(n(A.claims_rows_graded)) + ', sales forecasts ' + fmtCount(n(A.claims_forecast_came_true)) + ' of ' + fmtCount(n(A.claims_forecast_graded)) : n(A.claims_forecast_graded) > 0 ? 'Sales forecasts now due' : 'Dated claims now due'}</span></div>
       </div>
     </section>
   );
@@ -17561,7 +17561,8 @@ function v3PlainAction(row){
     return P(t ? 'Bring retargeting back to about ' + t + ' a month' : 'Bring retargeting spend back down', raw); }
   if (/^basket-pair/.test(id)) { const add = (raw.match(/Offer "([^"]+)" as the add-on/) || [])[1];
     return P(add ? 'Offer the ' + add + ' as an add-on' : 'Offer an add-on to single-item orders', raw); }
-  if (id === 'crm-flows') return P(/switched off/i.test(raw) ? 'Fix the email sent after an order, and switch on the emails that suggest more products' : 'Fix the automatic emails that earn least', raw);
+  // 1353: the title said "the email sent after an order" whatever the email was; on frkl it was a browse-abandonment one
+  if (id === 'crm-flows') return P(/switched off/i.test(raw) ? (/^Your "/.test(raw) ? 'Fix the automatic email that earns least, and switch on the emails that suggest more products' : 'Switch on the emails that suggest more products') : 'Fix the automatic emails that earn least', raw);
   if (id === 'basket-free-shipping') return P('Show shoppers how close they are to free shipping', raw);
   // 0453: the cap now carries its £ for the next sale; the paragraph is the why, not the title
   // The cap is the row's own figure (25% on one brand, 35% on another); the title printed 30% on both (11 Nov).
