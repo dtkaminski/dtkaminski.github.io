@@ -3934,16 +3934,14 @@ function V3ProfitLead({ view, costsVerified }) {
   // What to do, from the last 30 days whatever the date control says: the plan and a typical month are monthly.
   const goBtn = (dest, label, primary, section) => <button type="button" className={'v3-btn v3-btn-sm' + (primary ? ' v3-btn-p' : '')} onClick={() => window.__oiGo && window.__oiGo(dest, section)}>{label}</button>;
   const moves = [];
-  if (shift) moves.push({ key: 'shift', t: 'Move this month’s ad budget into ' + gpMonthName(shift.peak.month),
-    sub: 'Plan ' + fmtMoneyK(v3Fig('ad_month_budget', figQ.rows).value != null ? v3Fig('ad_month_budget', figQ.rows).value : shift.cur.spend) + ' in ' + gpMonthName(shift.cur.month) + ' and ' + fmtMoneyK(shift.peak.spend) + ' in ' + gpMonthName(shift.peak.month) + ', against ' + fmtMoneyK(shift.proj) + ' this month at this pace.' + (shift.lyCost != null ? ' A new customer cost ' + fmtMoney(shift.lyCost, 2) + ' last ' + gpMonthName(shift.peak.month) + '.' : ''),
-    worth: shift.gain >= 200 ? fmtMoneyK(shift.gain) : null, worthSub: 'more profit, same total',
-    conf: <V3Conf state="probably" detail="This month’s spend so far is measured. The monthly split is the plan, built from your own busy and quiet months. It assumes each extra £1 of ads wins a little less than the one before."/>,
-    btn: goBtn('growth', 'Open Growth plan', true) });
-  if (!shift && T && extra > Math.max(250, T.spend * 0.2)) moves.push({ key: 'extra', t: 'Bring ad spend back toward ' + fmtMoney(T.spend) + ' a month',
-    sub: fmtMoney(extra) + ' above a typical month, with sales ' + salesWord + '.',
-    worth: 'Up to ' + fmtMoney(extra), worthSub: 'a month',
-    conf: <V3Conf state="probably" detail="Spend and sales are measured. The guess is that cutting the extra spend will not cost sales. That held in the months shown, when spend rose and sales did not."/>,
-    btn: goBtn('marketing', 'Open Marketing', !shift) });
+  // 26 Nov eval: this panel worked out its own ad advice ("Bring ad spend back toward £8,310 a month", "Move this month’s
+  // ad budget into December") against a typical month, in peak week, beside fn_brand_ad_decision's "not on ads as a whole".
+  // 1156: the answer on ad spend is quoted, never worked out on a page. Its worth is the board's, so none is shown here.
+  const adA = S0 && S0.ad_decision, adLead = adA && adA.lead ? String(adA.lead) : null;
+  if (adLead) { const adSaid = String(adA.said || '');
+    moves.push({ key: 'ads', t: adLead.replace(/\.$/, ''),
+      sub: adSaid.indexOf(adLead) === 0 ? v3FirstSentences(adSaid.slice(adLead.length).trim(), 2) : '',
+      worth: null, conf: null, btn: goBtn('goal', 'Open Goal & costs', true) }); }
   if (op != null && op < 0) moves.push({ key: 'overheads', t: 'Cover your running costs',
     // 18 Nov: the loss is after the 30 days' running costs (overheads_30d), the figure the table above shows
     sub: 'A loss of ' + fmtMoney(Math.abs(op)) + ' after ' + (oh30 != null ? fmtMoney(oh30) + ' of running costs in the last 30 days. ' : 'running costs. ') + (maxSpend > 0 ? 'Break-even: ads at ' + fmtMoney(maxSpend) + ' a month, or ' + fmtMoney(needSales) + ' of sales a month.' : 'Break-even: ' + fmtMoney(needSales) + ' of sales a month at this ad spend.'),
@@ -4056,11 +4054,11 @@ function V3ProfitLead({ view, costsVerified }) {
       <div className="v3-panel-head"><h2>Actions</h2>{moves.length > 0 && <span className="v3-count">{moves.length}</span>}<span className="v3-muted">From these figures, last 30 days</span>
         <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
       {moves.length ? <table className="v3-home-table">
-        <thead><tr><th>Action</th>{moves.some(m => m.worth) && <th className="r">Worth</th>}<th>Confidence</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <thead><tr><th>Action</th>{moves.some(m => m.worth) && <th className="r">Worth</th>}{moves.some(m => m.conf) && <th>Confidence</th>}<th><span className="v3-sr-only">Open</span></th></tr></thead>
         <tbody>{moves.map(m => (<tr key={m.key}>
           <td className="v3-home-act"><span className="v3-home-title-static">{m.t}</span><span className="v3-home-sub">{m.sub}</span></td>
           {moves.some(x => x.worth) && <td className="v3-home-worth" data-k="Worth">{m.worth && <><b>{m.worth}</b><small>{m.worthSub}</small></>}</td>}
-          <td className="v3-home-basis" data-k="Basis">{m.conf}</td>
+          {moves.some(x => x.conf) && <td className="v3-home-basis" data-k="Basis">{m.conf}</td>}
           <td className="v3-home-open">{m.btn}</td>
         </tr>))}</tbody></table>
       : <p className="v3-panel-note">{T ? 'Nothing on this page needs acting on. Everything else is on Actions.' : 'Everything to act on is on Actions.'}</p>}
