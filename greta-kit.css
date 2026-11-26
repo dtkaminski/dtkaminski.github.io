@@ -2808,13 +2808,13 @@ td.v3-tpl-fig { font-weight: var(--weight-normal); white-space: nowrap; }
 
 /* A figure strip that is a panel's whole body (Actions: Action value). Five across; two on a phone. */
 .v3-figs-panel { grid-auto-flow: row; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0; padding: var(--space-4); border-top: 0; }
-.v3-actval { margin-bottom: var(--space-6); }
+.v3-actval { margin: var(--space-6) 0; }
 @media (max-width: 760px) {
   .v3-figs-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Missing figures (Actions, Ask Greta): one question, its ready answers lettered, a number field, a way to put it off. */
-.v3-gaps { margin-bottom: var(--space-6); }
+.v3-gaps { margin: var(--space-6) 0; }
 .v3-gap-title { font-weight: var(--weight-semi); color: var(--color-ink); }
 .v3-gap-note { margin: var(--space-1) 0 var(--space-3); font-size: var(--text-sm); }
 .v3-gap-opts { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }

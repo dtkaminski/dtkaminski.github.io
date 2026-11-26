@@ -10071,7 +10071,6 @@ ${dataStr}`;
   ];
 
   return (<div>
-    {UI_V3 && <V3MissingFigures/>}
     <div className="card" style={{marginBottom:14}}>
       {!UI_V3 && <h2>Ask Greta</h2>}
       <p className="v3-note v3-measure" style={{marginTop:0}}>Answers come from the same figures your pages show, which are sent to an AI model to write the reply. Your questions and the answers are kept in your workspace, private to your team, so you can come back to them on any device.</p>
@@ -10100,6 +10099,8 @@ ${dataStr}`;
         <button className="v3-btn" onClick={send} disabled={loading||!question.trim()}>Try again</button>
       </div>)}
     </div>
+    {/* 26 Nov eval: this sat above the question box and pushed Ask's own button off a phone's first screen */}
+    {UI_V3 && <V3MissingFigures/>}
     {history.length > 0 && (<div className="card">
       <h2>Conversation</h2>
       <div style={{display:'flex',flexDirection:'column',gap:12,maxHeight:600,overflowY:'auto'}}>
@@ -12248,8 +12249,8 @@ function V3ActionValue(){
     <section className="v3-panel v3-actval v3-enter" aria-label="Action value">
       <div className="v3-panel-head"><h2>Action value</h2><span className="v3-muted">A month, if each action does what it says</span></div>
       <div className="v3-figs v3-figs-panel">
-        <div className="v3-stat"><span className="v3-stat-lab">On the board</span><div className="v3-stat-val">{v3Gbp(n(A.found_gbp_month))}</div><span className="v3-stat-foot v3-muted">{acts(A.found_rows)}</span></div>
-        <div className="v3-stat"><span className="v3-stat-lab">Checkable after acting</span><div className="v3-stat-val">{v3Gbp(n(A.checkable_gbp_month))}</div><span className="v3-stat-foot v3-muted">{acts(A.checkable_rows)}</span></div>
+        <div className="v3-stat"><span className="v3-stat-lab">On the board</span><div className="v3-stat-val">{v3GbpRound(n(A.found_gbp_month))}</div><span className="v3-stat-foot v3-muted">{acts(A.found_rows)}</span></div>
+        <div className="v3-stat"><span className="v3-stat-lab">Checkable after acting</span><div className="v3-stat-val">{v3GbpRound(n(A.checkable_gbp_month))}</div><span className="v3-stat-foot v3-muted">{acts(A.checkable_rows)}</span></div>
         <div className="v3-stat"><span className="v3-stat-lab">Done</span><div className="v3-stat-val">{fmtCount(done)}</div><span className="v3-stat-foot v3-muted">{seen > 0 ? fmtCount(seen) + ' seen in your data' : 'None seen in your data'}</span></div>
         <div className="v3-stat"><span className="v3-stat-lab">Measured</span><div className="v3-stat-val">{v3Gbp(n(A.proven_gbp))}</div><span className="v3-stat-foot v3-muted">{fmtCount(n(A.done_worked))} worked, {fmtCount(n(A.done_not_judged))} not judged</span></div>
         <div className="v3-stat"><span className="v3-stat-lab">Claims come true</span><div className="v3-stat-val">{graded > 0 ? fmtCount(n(A.claims_came_true)) + ' of ' + fmtCount(graded) : FMT_NONE}</div><span className="v3-stat-foot v3-muted">{graded > 0 ? 'Dated claims now due' : 'None due yet'}</span></div>
@@ -12263,10 +12264,12 @@ function ActionsView(){
     <div>
       {/* No heading here: the page head one line above already reads "Actions / What should I do
           first?". Saying it twice is the kind of thing that makes a product feel unedited. */}
-      <V3ActionValue/>
-      <V3MissingFigures/>
+      {/* 26 Nov eval: the value strip and the missing-figures prompt sat above the board, so frkl's first row began
+          1,247 px down a 900 px screen (1,745 px on a phone). The board leads; both follow it. */}
       <V3ActionBoard/>
       <V3GretaRuns/>
+      <V3ActionValue/>
+      <V3MissingFigures/>
       {/* V3: the browser planner's stock list (28 to order, sized to its own demand plan, against the
           board's 21) and the 137-day-old specialist review (a £4.8k "act now" from a browser rule that
           the board never raised) are gone. Stock & orders is the one order list; the stock row opens it. */}
